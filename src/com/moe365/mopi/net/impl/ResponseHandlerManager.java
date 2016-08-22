@@ -35,9 +35,7 @@ public class ResponseHandlerManager implements Runnable {
 					return MAX_CLEANUP_WAIT;
 				}
 			}
-			int[] ids = handler.getIds();
-			for (int i = 0; i < ids.length; i++)
-				handlers.remove(ids[i]);
+			handlers.remove(handler.getId());
 			//TODO possibly move execution to another thread
 			handler.onTimeout();
 		}
@@ -60,9 +58,7 @@ public class ResponseHandlerManager implements Runnable {
 		}
 	}
 	public void addHandler(ResponseHandler handler) {
-		int[] ids = handler.getIds();
-		for (int i = 0; i < ids.length; i++)
-			handlers.put(ids[i], handler);
+		handlers.put(handler.getId(), handler);
 		queue.offer(handler);
 	}
 	/**
@@ -79,8 +75,8 @@ public class ResponseHandlerManager implements Runnable {
 		}
 	}
 	public static abstract class ResponseHandler {
-		public static ResponseHandler with(int[] ids, Instant invalidationTime, boolean removeAfterResponse, Consumer<DataPacket> responseHandler, Runnable onTimeout) {
-			return new ResponseHandler(ids, invalidationTime, removeAfterResponse) {
+		public static ResponseHandler with(int id, Instant invalidationTime, boolean removeAfterResponse, Consumer<DataPacket> responseHandler, Runnable onTimeout) {
+			return new ResponseHandler(id, invalidationTime, removeAfterResponse) {
 				@Override
 				public void onTimeout() {
 					onTimeout.run();
@@ -91,8 +87,8 @@ public class ResponseHandlerManager implements Runnable {
 				}
 			};
 		}
-		public static ResponseHandler with(int[] ids, Instant invalidationTime, boolean removeAfterResponse, BiConsumer<DataChannelClient, DataPacket> responseHandler, Runnable onTimeout) {
-			return new ResponseHandler(ids, invalidationTime, removeAfterResponse) {
+		public static ResponseHandler with(int[] id, Instant invalidationTime, boolean removeAfterResponse, BiConsumer<DataChannelClient, DataPacket> responseHandler, Runnable onTimeout) {
+			return new ResponseHandler(id, invalidationTime, removeAfterResponse) {
 				@Override
 				public void onTimeout() {
 					onTimeout.run();
@@ -103,19 +99,19 @@ public class ResponseHandlerManager implements Runnable {
 				}
 			};
 		}
-		protected final int[] ids;
+		protected final int id;
 		protected final Instant invalidationTime;
 		protected final boolean removeAfterResponse;
-		public ResponseHandler(int[] ids, Instant invalidationTime, boolean removeAfterResponse) {
-			this.ids = ids;
+		public ResponseHandler(int id, Instant invalidationTime, boolean removeAfterResponse) {
+			this.id = id;
 			this.invalidationTime = invalidationTime;
 			this.removeAfterResponse = removeAfterResponse;
 		}
 		public Instant getInvalidationTime() {
 			return invalidationTime;
 		}
-		public int[] getIds() {
-			return ids;
+		public int getId() {
+			return id;
 		}
 		public boolean doRemoveAfterResponse() {
 			return this.removeAfterResponse;

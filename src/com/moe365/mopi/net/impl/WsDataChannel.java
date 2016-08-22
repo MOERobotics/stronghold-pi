@@ -132,7 +132,7 @@ public class WsDataChannel implements DataChannel {
 		DataPacket prepared = preparePacket(packet);
 		final CompletableFuture<DataPacket> result = new CompletableFuture<>();
 		this.source.responseHandlerManager
-				.addHandler(ResponseHandler.with(new int[] { packet.getId() }, Instant.now().plus(timeout), true,
+				.addHandler(ResponseHandler.with(packet.getId(), Instant.now().plus(timeout), true,
 						result::complete, () -> result.completeExceptionally(new TimeoutException())));
 		doSendPacket(prepared, ((WsDataChannelClient)target).getSession().getRemote());
 		return result;
