@@ -23,7 +23,7 @@ import com.moe365.mopi.net.packet.DataPacket;
 import com.moe365.mopi.net.packet.MutableDataPacket;
 import com.moe365.mopi.net.packet.MutableWrappingDataPacket;
 
-public class WsDataChannelImpl implements DataChannel {
+public class WsDataChannel implements DataChannel {
 	protected WsDataSource source;
 	protected int id;
 	protected String name;
