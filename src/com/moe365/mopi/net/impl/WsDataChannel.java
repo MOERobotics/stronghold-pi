@@ -23,6 +23,11 @@ import com.moe365.mopi.net.packet.DataPacket;
 import com.moe365.mopi.net.packet.MutableDataPacket;
 import com.moe365.mopi.net.packet.MutableWrappingDataPacket;
 
+/**
+ * An implementation of {@link com.moe365.moepi.net.channel.DataChannel DataChannel}
+ * for the WebSocket protocol.
+ * @author mailmindlin
+ */
 public class WsDataChannel implements DataChannel {
 	protected WsDataSource source;
 	protected int id;
