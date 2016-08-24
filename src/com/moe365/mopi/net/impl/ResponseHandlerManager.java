@@ -87,7 +87,7 @@ public class ResponseHandlerManager implements Runnable {
 				}
 			};
 		}
-		public static ResponseHandler with(int[] id, Instant invalidationTime, boolean removeAfterResponse, BiConsumer<DataChannelClient, DataPacket> responseHandler, Runnable onTimeout) {
+		public static ResponseHandler with(int id, Instant invalidationTime, boolean removeAfterResponse, BiConsumer<DataChannelClient, DataPacket> responseHandler, Runnable onTimeout) {
 			return new ResponseHandler(id, invalidationTime, removeAfterResponse) {
 				@Override
 				public void onTimeout() {
