@@ -6,7 +6,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 import org.eclipse.jetty.websocket.api.Session;
 import org.eclipse.jetty.websocket.api.WebSocketListener;
@@ -20,8 +20,12 @@ import org.eclipse.jetty.websocket.servlet.WebSocketServletFactory;
 import com.moe365.mopi.net.channel.DataChannel;
 import com.moe365.mopi.net.channel.DataChannelClient;
 import com.moe365.mopi.net.channel.DataSource;
+import com.moe365.mopi.net.exception.ErrorCode;
 import com.moe365.mopi.net.packet.DataPacket;
+import com.moe365.mopi.net.packet.ErrorPacket.MutableErrorPacket;
 import com.moe365.mopi.util.StringUtils;
+
+import android.util.SparseArray;
 
 public class WsDataSource extends WebSocketServlet implements DataSource {
 	private static final long serialVersionUID = -902434272219432543L;
@@ -30,6 +34,8 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 	 */
 	protected volatile int lastPacketId = 0;
 	protected ResponseHandlerManager responseHandlerManager = new ResponseHandlerManager();
+	protected SparseArray<WsDataChannel> channels = new SparseArray<>();
+	protected SparseArray<Function<ByteBuffer, DataPacket>> packetBuilders = new SparseArray<>();
 	protected ExecutorService executor = Executors.newCachedThreadPool(new ThreadFactory() {
 		volatile int threadId = 0;
 
@@ -50,14 +56,13 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 
 	@Override
 	public void registerChannel(DataChannel channel) {
-		// TODO Auto-generated method stub
-
+		channels.append(channel.getId(), (WsDataChannel) channel);
 	}
 
 	@Override
 	public void unregisterChannel(DataChannel channel) {
-		// TODO Auto-generated method stub
-
+		//TODO check if valid op
+		channels.remove(channel.getId());
 	}
 
 	public class WsClient implements WebSocketListener, DataChannelClient {
@@ -102,9 +107,46 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 			System.out.println(StringUtils.toHexString(arr, offset, length, 16));
 			//Read packet
 			ByteBuffer buf = ByteBuffer.wrap(arr, offset, length);
-			int packetType = buf.getShort(DataPacket.TYPE_CODE_OFFSET) & 0xFF_FF;
-			int channelId = buf.getShort(DataPacket.CHANNEL_ID_OFFSET) & 0xFF_FF;
+			//TODO check packet size, to make sure that we can even read the header fields
 			
+			//Get builder
+			int packetType = buf.getShort(DataPacket.TYPE_CODE_OFFSET) & 0xFF_FF;//Convert ushort=>int
+			Function<ByteBuffer, DataPacket> builder = WsDataSource.this.packetBuilders.get(packetType);
+			if (builder == null) {
+				//TODO handle
+			}
+			
+			//Build packet
+			DataPacket packet;
+			try {
+				packet = builder.apply(buf);
+			} catch (Exception e) {
+				//TODO handle
+				e.printStackTrace();
+				return;
+			}
+			
+			//Respond to ACK listener(s)
+			if (packet.getAckId() != 0)
+				WsDataSource.this.responseHandlerManager.handle(this, packet);
+			
+			//Get channel
+			//TODO support meta channel id #0
+			int channelId = buf.getShort(DataPacket.CHANNEL_ID_OFFSET) & 0xFF_FF;//Convert ushort=>int
+			WsDataChannel channel = WsDataSource.this.channels.get(channelId);
+			if (channel == null) {
+				try {
+					MutableErrorPacket error = new MutableErrorPacket(ErrorCode.INVALID_CHANNEL, "Unable to find channel with id " + channelId);
+					error.setAckId(buf.getInt(DataPacket.CHANNEL_ID_OFFSET));
+					error.setChannelId(channelId);
+					this.write(error.getBuffer());
+				} catch (Exception e) {
+					new RuntimeException("Error while writing error packet for invalid channel", e).printStackTrace();
+				}
+				return;
+			}
+			
+			channel.handlePacketRecieve(packet, this);
 		}
 
 		@Override

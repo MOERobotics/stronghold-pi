@@ -178,6 +178,10 @@ public class WsDataChannel implements DataChannel {
 		// TODO Auto-generated method stub
 		
 	}
+	
+	protected void handlePacketRecieve(DataPacket packet, DataChannelClient client) {
+		//TODO finish
+	}
 
 	@Override
 	public boolean isOpen() {
