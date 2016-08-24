@@ -11,13 +11,20 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.eclipse.jetty.websocket.api.Session;
 import org.eclipse.jetty.websocket.api.WebSocketListener;
 import org.eclipse.jetty.websocket.api.WriteCallback;
+import org.eclipse.jetty.websocket.servlet.ServletUpgradeRequest;
+import org.eclipse.jetty.websocket.servlet.ServletUpgradeResponse;
+import org.eclipse.jetty.websocket.servlet.WebSocketCreator;
+import org.eclipse.jetty.websocket.servlet.WebSocketServlet;
+import org.eclipse.jetty.websocket.servlet.WebSocketServletFactory;
 
 import com.moe365.mopi.net.channel.DataChannel;
 import com.moe365.mopi.net.channel.DataChannelClient;
 import com.moe365.mopi.net.channel.DataSource;
+import com.moe365.mopi.net.packet.DataPacket;
 import com.moe365.mopi.util.StringUtils;
 
-public class WsDataSource implements DataSource {
+public class WsDataSource extends WebSocketServlet implements DataSource {
+	private static final long serialVersionUID = -902434272219432543L;
 	/**
 	 * Last id for a packet sent from the server.
 	 */
@@ -53,7 +60,7 @@ public class WsDataSource implements DataSource {
 
 	}
 
-	public static class WsDataSourceClient implements WebSocketListener, DataChannelClient {
+	public class WsClient implements WebSocketListener, DataChannelClient {
 		Session session;
 
 		public CompletableFuture<Void> write(ByteBuffer data) {
@@ -91,14 +98,30 @@ public class WsDataSource implements DataSource {
 		}
 
 		@Override
-		public void onWebSocketBinary(byte[] buf, int offset, int length) {
-			System.out.println(StringUtils.toHexString(buf, offset, length, 16));
+		public void onWebSocketBinary(byte[] arr, int offset, int length) {
+			System.out.println(StringUtils.toHexString(arr, offset, length, 16));
+			//Read packet
+			ByteBuffer buf = ByteBuffer.wrap(arr, offset, length);
+			int packetType = buf.getShort(DataPacket.TYPE_CODE_OFFSET) & 0xFF_FF;
+			int channelId = buf.getShort(DataPacket.CHANNEL_ID_OFFSET) & 0xFF_FF;
+			
 		}
 
 		@Override
 		public void onWebSocketText(String data) {
 			// We aren't really interested in text messages
 		}
+	}
 
+	@Override
+	public void configure(WebSocketServletFactory factory) {
+		//Wouldn't have figured this out if not for github.com/czyzby/reinvent/blob/master/websocket/src/com/github/czyzby/reinvent/websocket/WebSocketServer.java
+		factory.setCreator(new WebSocketCreator() {
+			@Override
+			public Object createWebSocket(ServletUpgradeRequest request, ServletUpgradeResponse response) {
+				System.out.println("Generating client for " + request.getRequestPath());
+				return new WsClient();
+			}
+		});
 	}
 }

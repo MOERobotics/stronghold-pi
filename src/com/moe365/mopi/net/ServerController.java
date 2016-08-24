@@ -11,17 +11,20 @@ public class ServerController {
 	Server server;
 	public ServerController(int port) throws Exception {
 		server = new Server(port);
-		WebSocketHandler wsHandler = new WebSocketHandler() {
-			@Override
-			public void configure(WebSocketServletFactory factory) {
-				factory.register(WsDataSource.WsDataSourceClient.class);
-			}
-		};
-		server.setHandler(wsHandler);
+		addWsHandler();
 		server.start();
 		server.join();
 	}
-	public static void main(String...fred) throws Exception {
+
+	protected void addWsHandler() {
+		WsDataSource source = new WsDataSource();
+		final ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS|ServletContextHandler.NO_SECURITY);
+		context.setContextPath("/");
+		server.setHandler(context);
+		context.addServlet(new ServletHolder(source), "/");
+	}
+
+	public static void main(String... fred) throws Exception {
 		new ServerController(8080);
 	}
 }
