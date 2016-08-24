@@ -77,7 +77,7 @@ public class WsDataChannel implements DataChannel {
 			mutablePacket = (MutableDataPacket) packet;
 		else
 			mutablePacket = new MutableWrappingDataPacket(packet);
-		mutablePacket.setId(source.lastId.getAndIncrement());
+		mutablePacket.setId(source.lastPacketId++);
 		mutablePacket.setChannelId(this.getId());
 		return mutablePacket;
 	}

@@ -18,7 +18,10 @@ import com.moe365.mopi.net.channel.DataSource;
 import com.moe365.mopi.util.StringUtils;
 
 public class WsDataSource implements DataSource {
-	protected final AtomicInteger lastId = new AtomicInteger(0);
+	/**
+	 * Last id for a packet sent from the server.
+	 */
+	protected volatile int lastPacketId = 0;
 	protected ResponseHandlerManager responseHandlerManager = new ResponseHandlerManager();
 	protected ExecutorService executor = Executors.newCachedThreadPool(new ThreadFactory() {
 		volatile int threadId = 0;
