@@ -173,4 +173,22 @@ public class WsDataChannel implements DataChannel {
 		return this.packetRecievedHandlers.remove(handler);
 	}
 
+	@Override
+	public void unsubscribe(DataChannelClient subscriber) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public boolean isOpen() {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	@Override
+	public void close() {
+		// TODO Auto-generated method stub
+		
+	}
+
 }
