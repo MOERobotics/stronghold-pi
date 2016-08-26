@@ -212,14 +212,24 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 			System.out.println(StringUtils.toHexString(arr, offset, length, 16));
 			//Read packet
 			ByteBuffer buf = ByteBuffer.wrap(arr, offset, length);
-			//TODO check packet size, to make sure that we can even read the header fields
+			//check packet size, to make sure that we can read the header fields
+			if (length < DataPacket.HEADER_LENGTH) {
+				System.err.println("Recieved packet w/ length=" + length);
+				return;
+			}
 			
 			//Get builder
-			int packetType = buf.getShort(DataPacket.TYPE_CODE_OFFSET) & 0xFF_FF;//Convert ushort=>int
+			int packetType = buf.getShort(buf.position() + DataPacket.TYPE_CODE_OFFSET) & 0xFF_FF;//Convert ushort=>int
 			Function<ByteBuffer, DataPacket> builder = WsDataSource.this.packetBuilders.get(packetType);
 			if (builder == null) {
-				//TODO handle
+				System.err.println("Unknown packet ID " + packetType);
+				write(new MutableErrorPacket(ErrorCode.UNKNOWN_PACKET_TYPE, "Unknown packet type #" + packetType)
+						.setId(lastPacketId++)
+						.setAckId(buf.getShort(buf.position() + DataPacket.PACKET_ID_OFFSET))
+						.setChannelId(0));//TODO should this be sent on the same channel?
+				return;		
 			}
+			System.out.println("Builder: " + builder);
 			
 			//Build packet
 			DataPacket packet;
@@ -230,28 +240,34 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 				e.printStackTrace();
 				return;
 			}
+			System.out.println("Packet: " + packet);
 			
 			//Respond to ACK listener(s)
 			if (packet.getAckId() != 0)
 				WsDataSource.this.responseHandlerManager.handle(this, packet);
 			
 			//Get channel
-			//TODO support meta channel id #0
-			int channelId = buf.getShort(DataPacket.CHANNEL_ID_OFFSET) & 0xFF_FF;//Convert ushort=>int
-			WsDataChannel channel = WsDataSource.this.channels.get(channelId);
+			int channelId = buf.getShort(offset + DataPacket.CHANNEL_ID_OFFSET) & 0xFF_FF;//Convert ushort=>int
+			AbstractWsDataChannel channel = WsDataSource.this.channels.get(channelId);
 			if (channel == null) {
-				try {
-					MutableErrorPacket error = new MutableErrorPacket(ErrorCode.INVALID_CHANNEL, "Unable to find channel with id " + channelId);
-					error.setAckId(buf.getInt(DataPacket.CHANNEL_ID_OFFSET));
-					error.setChannelId(channelId);
-					this.write(error.getBuffer());
-				} catch (Exception e) {
-					new RuntimeException("Error while writing error packet for invalid channel", e).printStackTrace();
-				}
+				write(new MutableErrorPacket(ErrorCode.INVALID_CHANNEL, "Unable to find channel with id " + channelId)
+						.setAckId(buf.getInt(offset + DataPacket.CHANNEL_ID_OFFSET))
+						.setId(lastPacketId++)
+						.setChannelId(channelId))
+					.exceptionally(e->{new RuntimeException("Error while writing error packet for invalid channel", e).printStackTrace();return null;});
 				return;
 			}
 			
-			channel.handlePacketRecieve(packet, this);
+			try {
+				channel.onRecievePacket(packet, this);
+			} catch (Exception e0) {
+				write(new MutableErrorPacket(ErrorCode.INTERNAL_ERROR, e0.getMessage())
+						.setAckId(buf.getInt(offset + DataPacket.CHANNEL_ID_OFFSET))
+						.setId(lastPacketId++)
+						.setChannelId(channelId))
+					//Yes, really
+					.exceptionally(e->{new RuntimeException("Error while writing error packet for internal error", e).printStackTrace();return null;});
+			}
 		}
 
 		@Override
