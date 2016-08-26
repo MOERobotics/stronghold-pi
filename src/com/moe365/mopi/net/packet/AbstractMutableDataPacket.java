@@ -7,15 +7,26 @@ import java.nio.ByteBuffer;
 
 public abstract class AbstractMutableDataPacket implements MutableDataPacket {
 	protected int id;
-	protected int ackId;
 	protected int channelId;
 	protected int typeCode;
-	
+	protected int ackId;
+
+	public AbstractMutableDataPacket() {
+
+	}
+
+	public AbstractMutableDataPacket(ByteBuffer buf) {
+		this.typeCode = buf.getShort() & 0xFF_FF;
+		this.channelId = buf.getShort() & 0xFF_FF;
+		this.id = buf.getInt();
+		this.ackId = buf.getInt();
+	}
+
 	@Override
 	public int getId() {
 		return id;
 	}
-	
+
 	@Override
 	public int getAckId() {
 		return ackId;
