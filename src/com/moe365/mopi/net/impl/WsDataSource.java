@@ -1,8 +1,11 @@
 package com.moe365.mopi.net.impl;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -20,15 +23,30 @@ import org.eclipse.jetty.websocket.servlet.WebSocketServletFactory;
 import com.moe365.mopi.net.channel.DataChannel;
 import com.moe365.mopi.net.channel.DataChannelClient;
 import com.moe365.mopi.net.channel.DataSource;
+import com.moe365.mopi.net.channel.UnsubscriptionReason;
 import com.moe365.mopi.net.exception.ErrorCode;
+import com.moe365.mopi.net.packet.AckPacket;
+import com.moe365.mopi.net.packet.ChannelEnumerationPacket;
+import com.moe365.mopi.net.packet.ChannelEnumerationRequestPacket;
+import com.moe365.mopi.net.packet.ChannelSubscribePacket;
+import com.moe365.mopi.net.packet.ChannelUnsubscribePacket;
+import com.moe365.mopi.net.packet.ClientHelloPacket;
 import com.moe365.mopi.net.packet.DataPacket;
+import com.moe365.mopi.net.packet.ErrorPacket;
 import com.moe365.mopi.net.packet.ErrorPacket.MutableErrorPacket;
+import com.moe365.mopi.net.packet.PacketTypeCode;
+import com.moe365.mopi.net.packet.PropertyEnumerationPacket;
+import com.moe365.mopi.net.packet.PropertyEnumerationRequestPacket;
+import com.moe365.mopi.net.packet.PropertyValuesPacket;
+import com.moe365.mopi.net.packet.PropertyValuesRequestPacket;
+import com.moe365.mopi.net.packet.ServerHelloPacket;
 import com.moe365.mopi.util.StringUtils;
 
 import android.util.SparseArray;
 
 public class WsDataSource extends WebSocketServlet implements DataSource {
 	private static final long serialVersionUID = -902434272219432543L;
+	public static final int SERVER_VERSION = 0;
 	/**
 	 * Last id for a packet sent from the server.
 	 */
@@ -164,7 +182,28 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 
 	public class WsClient implements WebSocketListener, DataChannelClient {
 		Session session;
+		protected HashMap<String, Object> properties;
+		
+		public void sessionPut(String key, Object value) {
+			if (properties == null)
+				this.properties = (HashMap<String, Object>)(Object)new ConcurrentHashMap<String, Object>();
+			properties.put(key, value);
+		}
+		
+		@SuppressWarnings("unchecked")
+		public <T> T sessionGet(String key) {
+			if (properties == null)
+				return null;
+			return (T) properties.get(key);
+		}
 
+		@Override
+		public CompletableFuture<Void> write(DataPacket packet) {
+			ByteBuffer buf = packet.writeTo(ByteBuffer.allocate(packet.getLength()));
+			buf.flip();
+			return write(buf);
+		}
+		
 		public CompletableFuture<Void> write(ByteBuffer data) {
 			CompletableFuture<Void> result = new CompletableFuture<>();
 			if (data.hasArray()) {
