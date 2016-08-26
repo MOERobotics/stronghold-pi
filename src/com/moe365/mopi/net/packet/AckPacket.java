@@ -1,11 +1,15 @@
 package com.moe365.mopi.net.packet;
+
+import java.nio.ByteBuffer;
+
 /**
  * <p>
- * A packet that acknowledges that another has recieved,
- * explicitly declaring that no error has occurred as a result
- * of any action invoked by the previous packet.
+ * A packet that acknowledges that another has recieved, explicitly declaring
+ * that no error has occurred as a result of any action invoked by the previous
+ * packet.
  * </p>
  * No <var>ACK</var> packet should be used to reply to an ACK packet.
+ * 
  * @author mailmindlin
  */
 @PacketTypeCode(PacketTypeCode.ACK)
