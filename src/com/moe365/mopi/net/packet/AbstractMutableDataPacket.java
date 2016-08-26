@@ -66,17 +66,17 @@ public abstract class AbstractMutableDataPacket implements MutableDataPacket {
 
 	@Override
 	public void writeExternal(ObjectOutput out) throws IOException {
+		out.writeShort((short) getTypeCode());
+		out.writeShort((short) getChannelId());
 		out.writeInt(getId());
 		out.writeInt(getAckId());
-		out.writeShort((short)getChannelId());
-		out.writeShort((short)getTypeCode());
 	}
 
 	@Override
 	public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+		this.typeCode = in.readUnsignedShort();
+		this.channelId = in.readUnsignedShort();
 		this.id = in.readInt();
 		this.ackId = in.readInt();
-		this.channelId = in.readUnsignedShort();
-		this.typeCode = in.readUnsignedShort();
 	}
 }

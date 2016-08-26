@@ -15,13 +15,13 @@ import java.nio.ByteBuffer;
  * @author mailmindlin
  */
 public interface DataPacket extends Externalizable {
-	public static final int LENGTH_OFFSET = 0;
+	public static final int TYPE_CODE_OFFSET = 0;
+	public static final int CHANNEL_ID_OFFSET = 2;
 	public static final int PACKET_ID_OFFSET = 4;
 	public static final int ACK_PACKET_ID_OFFSET = 8;
-	public static final int CHANNEL_ID_OFFSET = 12;
-	public static final int TYPE_CODE_OFFSET = 14;
-	public static final int DATA_OFFSET = 16;
-	public static final int HEADER_LENGTH = 16;
+	@Deprecated
+	public static final int DATA_OFFSET = 12;
+	public static final int HEADER_LENGTH = 12;
 	int getLength();
 	int getId();
 	int getAckId();
