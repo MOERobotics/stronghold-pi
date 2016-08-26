@@ -83,6 +83,82 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 		//TODO check if valid op
 		channels.remove(channel.getId());
 	}
+	
+	class MetaChannel extends AbstractWsDataChannel {
+
+		@Override
+		protected boolean onSubscription(DataChannelClient client) {
+			return false;//All clients are implicitly subscribed
+		}
+
+		@Override
+		protected void onRecievePacket(DataPacket packet, DataChannelClient client) {
+			System.out.println("Handling packet " + packet + ", type " + packet.getTypeCode());
+			switch (packet.getTypeCode()) {
+				case PacketTypeCode.CHANNEL_ENUMERATION_REQUEST: {
+					System.out.println("Channel enumeration request from " + client);
+					ChannelEnumerationPacket response = null;//TODO finish
+					response.setAckId(packet.getId())
+						.setId(lastPacketId++)
+						.setChannelId(0);
+					client.write(response);
+					break;
+				}
+				case PacketTypeCode.CHANNEL_METADATA_REQUEST:
+					System.out.println("Channel metadata request from " + client);
+					//TODO handle
+					break;
+				case PacketTypeCode.CHANNEL_SUBSCRIBE: {
+					System.out.println("Channel subscription from " + client);
+					ChannelSubscribePacket subscribePacket = (ChannelSubscribePacket) packet;
+					int[] ids = subscribePacket.getChannelIds();
+					for (int id : subscribePacket.getChannelIds()) {
+						System.out.println("\tSubscribing to channel #" + id);
+						AbstractWsDataChannel channel = channels.get(id);
+						//TODO figure out how to make atomic
+						if (channel == null || !channel.onSubscription(client)) {
+							System.err.println("Writing error");
+							client.write(new MutableErrorPacket(ErrorCode.INVALID_CHANNEL, "Cannot subscribe to channel " + (channel == null ? "null" : channel.getId()))
+								.setId(lastPacketId++)
+								.setChannelId(0)
+								.setAckId(packet.getId()));
+							return;
+						}
+					}
+					client.write(new AckPacket(packet.getId())
+						.setId(lastPacketId++)
+						.setChannelId(0));
+					break;
+				}
+				case PacketTypeCode.CHANNEL_UNSUBSCRIBE: {
+					ChannelUnsubscribePacket unsubscribePacket = (ChannelUnsubscribePacket) packet;
+					int[] ids = unsubscribePacket.getChannelIds();
+					UnsubscriptionReason[] reasons = unsubscribePacket.getReasons();
+					for (int i = 0; i < ids.length; i++) {
+						AbstractWsDataChannel channel = channels.get(ids[i]);
+						//TODO handle INVALID_CHANNEL
+						channel.onUnsubscription(client, reasons[i]);
+					}
+					break;
+				}
+				case PacketTypeCode.CHANNEL_ENUMERATION:
+				case PacketTypeCode.CHANNEL_METADATA:
+				default:
+					client.write(new MutableErrorPacket(ErrorCode.ILLEGAL_PACKET_TYPE, "Illegal packet type " + packet.getTypeCode())
+							.setAckId(packet.getId())
+							.setChannelId(0)
+							.setId(lastPacketId++));
+					break;
+			}
+		}
+
+		@Override
+		protected void onUnsubscription(DataChannelClient client, UnsubscriptionReason reason) {
+			// TODO Auto-generated method stub
+			
+		}
+		
+	}
 
 	public class WsClient implements WebSocketListener, DataChannelClient {
 		Session session;
