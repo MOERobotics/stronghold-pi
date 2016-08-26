@@ -34,7 +34,7 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 	 */
 	protected volatile int lastPacketId = 0;
 	protected ResponseHandlerManager responseHandlerManager = new ResponseHandlerManager();
-	protected SparseArray<WsDataChannel> channels = new SparseArray<>();
+	protected SparseArray<AbstractWsDataChannel> channels = new SparseArray<>();
 	protected SparseArray<Function<ByteBuffer, DataPacket>> packetBuilders = new SparseArray<>();
 	protected ExecutorService executor = Executors.newCachedThreadPool(new ThreadFactory() {
 		volatile int threadId = 0;
@@ -47,6 +47,25 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 			return t;
 		}
 	});
+	public WsDataSource() {
+		this.channels.put(0, new MetaChannel());
+		//Register constructors
+		packetBuilders.put(PacketTypeCode.SERVER_HELLO, ServerHelloPacket::new);
+		packetBuilders.put(PacketTypeCode.CLIENT_HELLO, ClientHelloPacket::new);
+		packetBuilders.put(PacketTypeCode.ERROR, ErrorPacket.MutableErrorPacket::new);
+		packetBuilders.put(PacketTypeCode.ACK, AckPacket::new);
+		packetBuilders.put(PacketTypeCode.CHANNEL_ENUMERATION_REQUEST, ChannelEnumerationRequestPacket::new);
+		packetBuilders.put(PacketTypeCode.CHANNEL_ENUMERATION, ChannelEnumerationPacket::new);
+		packetBuilders.put(PacketTypeCode.CHANNEL_SUBSCRIBE, ChannelSubscribePacket::new);
+		packetBuilders.put(PacketTypeCode.CHANNEL_UNSUBSCRIBE, ChannelUnsubscribePacket::new);
+		packetBuilders.put(PacketTypeCode.CHANNEL_CLOSE, null);
+		packetBuilders.put(PacketTypeCode.CHANNEL_METADATA_REQUEST, null);
+		packetBuilders.put(PacketTypeCode.CHANNEL_METADATA, null);
+		packetBuilders.put(PacketTypeCode.PROPERTY_ENUMERATION_REQUEST, PropertyEnumerationRequestPacket::new);
+		packetBuilders.put(PacketTypeCode.PROPERTY_ENUMERATION, PropertyEnumerationPacket::new);
+		packetBuilders.put(PacketTypeCode.PROPERTY_VALUES_REQUEST, PropertyValuesRequestPacket::new);
+		packetBuilders.put(PacketTypeCode.PROPERTY_VALUES, PropertyValuesPacket::new);
+	}
 
 	@Override
 	public List<DataChannel> getAvailableChannels() {
