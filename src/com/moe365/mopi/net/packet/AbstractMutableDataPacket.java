@@ -30,25 +30,29 @@ public abstract class AbstractMutableDataPacket implements MutableDataPacket {
 	public int getTypeCode() {
 		return typeCode;
 	}
-	
+
 	@Override
-	public void setId(int id) {
+	public AbstractMutableDataPacket setId(int id) {
 		this.id = id;
+		return this;
 	}
 
 	@Override
-	public void setAckId(int ack) {
+	public AbstractMutableDataPacket setAckId(int ack) {
 		this.ackId = ack;
+		return this;
 	}
 
 	@Override
-	public void setChannelId(int channel) {
+	public AbstractMutableDataPacket setChannelId(int channel) {
 		this.channelId = channel;
+		return this;
 	}
 
 	@Override
-	public void setTypeCode(int type) {
+	public AbstractMutableDataPacket setTypeCode(int type) {
 		this.typeCode = type;
+		return this;
 	}
 
 	@Override
