@@ -69,13 +69,15 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 
 	@Override
 	public List<DataChannel> getAvailableChannels() {
-		// TODO Auto-generated method stub
-		return null;
+		List<DataChannel> result = new ArrayList<>(channels.size());
+		for (int i = 0; i < channels.size(); i++)
+			result.add(channels.valueAt(i));
+		return result;
 	}
 
 	@Override
 	public void registerChannel(DataChannel channel) {
-		channels.append(channel.getId(), (WsDataChannel) channel);
+		channels.append(channel.getId(), (AbstractWsDataChannel) channel);
 	}
 
 	@Override
