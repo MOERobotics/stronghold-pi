@@ -9,14 +9,24 @@ package com.moe365.mopi.net.packet;
  * @author mailmindlin
  */
 @PacketTypeCode(PacketTypeCode.ACK)
-public interface AckPacket extends DataPacket {
-	public static class AckWrappedPacket extends AbstractWrappedDataPacket implements AckPacket {
-		
+public class AckPacket extends AbstractMutableDataPacket {
+	public AckPacket() {
+		super();
+		this.setTypeCode(PacketTypeCode.ACK);
 	}
-	public static class AckMutablePacket extends AbstractMutableDataPacket implements AckPacket {
-		@Override
-		public int getLength() {
-			return DataPacket.HEADER_LENGTH;
-		}
+
+	public AckPacket(int ackId) {
+		super();
+		this.setAckId(ackId);
+		this.setTypeCode(PacketTypeCode.ACK);
+	}
+	
+	public AckPacket(ByteBuffer buf) {
+		super(buf);
+	}
+
+	@Override
+	public int getLength() {
+		return DataPacket.HEADER_LENGTH;
 	}
 }
