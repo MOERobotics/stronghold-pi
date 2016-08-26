@@ -256,7 +256,8 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 		factory.setCreator(new WebSocketCreator() {
 			@Override
 			public Object createWebSocket(ServletUpgradeRequest request, ServletUpgradeResponse response) {
-				System.out.println("Generating client for " + request.getRequestPath());
+				response.setAcceptedSubProtocol("v" + WsDataSource.SERVER_VERSION + ".moews");
+				System.out.println("Generating client for " + request.getRequestPath() + ", protocol = " + request.getProtocolVersion() + ", " + request.getSubProtocols());
 				return new WsClient();
 			}
 		});
