@@ -167,19 +167,27 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 
 		public CompletableFuture<Void> write(ByteBuffer data) {
 			CompletableFuture<Void> result = new CompletableFuture<>();
-			session.getRemote().sendBytes(data, new WriteCallback() {
-
-				@Override
-				public void writeFailed(Throwable t) {
-					result.completeExceptionally(t);
-				}
-
-				@Override
-				public void writeSuccess() {
-					result.complete(null);
-				}
-
-			});
+			if (data.hasArray()) {
+				System.out.println("Writing: " + StringUtils.toHexString(data.array(), data.position(), data.limit(), 16));
+			}
+			try {
+				session.getRemote().sendBytes(data, new WriteCallback() {
+	
+					@Override
+					public void writeFailed(Throwable t) {
+						result.completeExceptionally(t);
+					}
+	
+					@Override
+					public void writeSuccess() {
+						result.complete(null);
+					}
+	
+				});
+			} catch (Exception e) {
+				e.printStackTrace();
+				result.completeExceptionally(e);
+			}
 			return result;
 		}
 
