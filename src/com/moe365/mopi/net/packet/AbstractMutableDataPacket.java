@@ -52,13 +52,11 @@ public abstract class AbstractMutableDataPacket implements MutableDataPacket {
 	}
 
 	@Override
-	public ByteBuffer getBuffer() {
-		ByteBuffer buf = ByteBuffer.allocate(getLength());
-		buf.putInt(DataPacket.LENGTH_OFFSET, getLength());
-		buf.putInt(DataPacket.PACKET_ID_OFFSET, getId());
-		buf.putInt(DataPacket.ACK_PACKET_ID_OFFSET, getAckId());
-		buf.putShort(DataPacket.CHANNEL_ID_OFFSET, (short)getChannelId());
-		buf.putShort(DataPacket.TYPE_CODE_OFFSET, (short)getTypeCode());
+	public ByteBuffer writeTo(ByteBuffer buf) {
+		buf.putShort((short) getTypeCode());
+		buf.putShort((short) getChannelId());
+		buf.putInt(getId());
+		buf.putInt(getAckId());
 		return buf;
 	}
 

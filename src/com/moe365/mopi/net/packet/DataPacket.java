@@ -27,5 +27,5 @@ public interface DataPacket extends Externalizable {
 	int getAckId();
 	int getChannelId();
 	int getTypeCode();
-	ByteBuffer getBuffer();
+	ByteBuffer writeTo(ByteBuffer buf);
 }

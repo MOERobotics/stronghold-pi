@@ -55,8 +55,6 @@ public interface ClientHelloPacket extends DataPacket {
 		}
 
 		@Override
-		public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-			super.readExternal(in);
 			this.protocolVersion = in.readInt();
 		}
 
@@ -66,11 +64,9 @@ public interface ClientHelloPacket extends DataPacket {
 			out.writeInt(getProtocolVersion());
 		}
 		
-		@Override
-		public ByteBuffer getBuffer() {
-			ByteBuffer result = super.getBuffer();
-			result.putInt(DataPacket.DATA_OFFSET, this.protocolVersion);
-			return result;
-		}
+	@Override
+	public ByteBuffer writeTo(ByteBuffer buf) {
+		return super.writeTo(buf)
+			.putInt(this.protocolVersion);
 	}
 }
