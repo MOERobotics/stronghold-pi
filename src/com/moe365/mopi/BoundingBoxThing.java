@@ -11,8 +11,123 @@ public class BoundingBoxThing {
 	 * Increasing this value will increase the speed of searching through an image,
 	 * while decreasing it will find more boxes
 	 */
-	private static final int MINDIM = 40;
+	private static final int MIN_WIDTH = 40;
+	private static final int MIN_HEIGHT = 40;
 	
+	public static final int nextPowerOf2(final int value) {
+		final int tmp = value - 1;
+		return (tmp >>> 16 | tmp >>> 8 | tmp >>> 4 | tmp >>> 2 | tmp >>> 1) + 1;
+	}
+	
+	public static boolean boundingBoxRecursive0(boolean[][] img, List<PreciseRectangle> bbr, final int xMin, final int xMax,
+			final int yMin, final int yMax) {
+		int width = xMax - xMin;
+		int height= yMax - yMin;
+		if (width < MIN_WIDTH || height < MIN_HEIGHT)
+			// The image is too small to possibly find any boxes that are larger than MINDIM
+			// in width and height
+			return false;
+		if (width >= height) {
+			//Compute smallest power of two greater than width
+			int step = nextPowerOf2(width);
+			while (step > MIN_WIDTH) {
+				//TODO optimize w/ bit twiddling
+				outer:
+				for (int split = xMin + (step / 2); split < xMax; split += step) {
+					for (int y = yMin; y < yMax; y++)
+						if (test(img, xMin + split, y))
+							continue outer;
+					return boundingBoxRecursive0(img, bbr, split, xMax, yMin, yMax) | boundingBoxRecursive0(img, bbr, xMin, split, yMin, yMax);
+				}
+				step /= 2;
+			}
+			while (step > 2) {
+				outer:
+				for (int split = xMin + (step / 2); split < xMax; split += step) {
+					for (int y = yMin; y < yMax; y++)
+						if (test(img, xMin + split, y))
+							continue outer;
+					boolean result = false;
+					if (split - xMin >= MIN_WIDTH)
+						//It's possible to create a box on the left side of the split
+						result |= boundingBoxRecursive0(img, bbr, split, xMax, yMin, yMax);
+					if (xMax - split >= MIN_WIDTH)
+						//It's possible to create a box on the right side of the split
+						result |= boundingBoxRecursive0(img, bbr, xMin, split, yMin, yMax);
+					return result;
+				}
+				step /= 2;
+			}
+			//Complete for top/bottom
+		}
+		int step = nextPowerOf2(height);
+		while (step > MIN_HEIGHT) {
+			outer:
+			for (int split = yMin + (step / 2); split < yMax; split += step) {
+				for (int x = 0; x < height; x++)
+					if (test(img, xMin + x, yMin + split))
+						continue outer;
+				return boundingBoxRecursive0(img, bbr, xMin, xMax, split, yMax) | boundingBoxRecursive0(img, bbr, xMin, xMax, yMin, split);
+			}
+			step /= 2;
+		}
+	}
+	/**
+	 * Called after the upper/lower bounds are known
+	 * @param img
+	 * @param bbr
+	 * @param xMin
+	 * @param xMax
+	 * @param yMin
+	 * @param yMax
+	 * @return
+	 */
+	public static boolean boundingBoxRecursiveW(boolean[][] img, List<PreciseRectangle> bbr, final int xMin, final int xMax,
+			final int yMin, final int yMax) {
+		final int width = xMax - xMin;
+		final int height= yMax - yMin;
+		if (width < MIN_WIDTH || height < MIN_WIDTH)
+			// The image is too small to possibly find any boxes that are larger than MINDIM
+			// in width and height
+			return false;
+		//Compute smallest power of two greater than width
+		int step = nextPowerOf2(width);
+		while (step > 2) {
+			//TODO optimize w/ bit twiddling
+			outer:
+			for (int split = xMin + (step / 2); split < xMax; split += step) {
+				for (int y = yMin; y < yMax; y++)
+					if (test(img, xMin + split, y))
+						continue outer;
+				return boundingBoxRecursive0(img, bbr, split, xMax, yMin, yMax) | boundingBoxRecursive0(img, bbr, xMin, split, yMin, yMax);
+			}
+			step /= 2;
+		}
+		return bbr.add(new PreciseRectangle(xMin, xMax, yMin, yMax));
+	}
+	public static boolean boundingBoxRecursiveH(boolean[][] img, List<PreciseRectangle> bbr, final int xMin, final int xMax,
+			final int yMin, final int yMax) {
+		final int width = xMax - xMin;
+		final int height= yMax - yMin;
+		if (width < MIN_WIDTH || height < MIN_HEIGHT)
+			// The image is too small to possibly find any boxes that are larger than MINDIM
+			// in width and height
+			return false;
+		//Compute smallest power of two greater than width
+		int step = nextPowerOf2(height);
+		while (step > 2) {
+			//TODO optimize w/ bit twiddling
+			outer:
+			for (int split = yMin + (step / 2); split < yMax; split += step) {
+				for (int x = xMin; x < xMax; x++)
+					if (test(img, x, yMin + split))
+						continue outer;
+				return boundingBoxRecursive0(img, bbr, split, xMax, yMin, yMax) | boundingBoxRecursive0(img, bbr, xMin, split, yMin, yMax);
+			}
+			step /= 2;
+		}
+		return bbr.add(new PreciseRectangle(xMin, xMax, yMin, yMax));
+	}
 /**
  * Recursive function to create a List of Rectangles bbr 
  * that represent all bounding boxes of minimum size MINDIM
@@ -39,14 +154,14 @@ public class BoundingBoxThing {
  */
 	public static boolean boundingBoxRecursive(boolean[][] img, List<PreciseRectangle> bbr, final int limXmin, final int limXmax,
 			final int limYmin, final int limYmax, int boundXmin, int boundXmax, int boundYmin, int boundYmax) {
-		if (((limXmax - limXmin) < MINDIM) || ((limYmax - limYmin) < MINDIM))
+		if (((limXmax - limXmin) < MIN_WIDTH) || ((limYmax - limYmin) < MIN_WIDTH))
 			// The image is too small to possibly find any boxes that are larger than MINDIM
 			// in width and height
 			return false;
 		// try to split the box in half vertically or horizontally and call
 		// recursively on the 2 halves
 		int x; //defined here since they will be reused and tested after for loops
-		int splitX = limXmin + (limXmax - limXmin) / 2; //half the width first vertical split line to try
+		final int splitX = limXmin + (limXmax - limXmin) / 2; //half the width first vertical split line to try
 		xLoop:
 		for (x = splitX; x > limXmin; x--) {
 			// Left side of half split, test all vertical lines till one doesn't go thru a contour
@@ -57,38 +172,30 @@ public class BoundingBoxThing {
 			//top edge case
 			if (test(img, x, limYmin)) {
 				//indicates if pixel is connected to the right or left
-				boolean leftBool  = test(img, x - 1, limYmin) && test(img, x - 1, limYmin + 1);
-				boolean rightBool = test(img, x + 1, limYmin) && test(img, x + 1, limYmin + 1);
-				if (leftBool && rightBool)
+				//if valid line, it is also a right edge
+				leftOff = test(img, x - 1, limYmin) && test(img, x - 1, limYmin + 1);
+				//if valid line, it is also a left edge
+				rightOff = test(img, x + 1, limYmin) && test(img, x + 1, limYmin + 1);
+				if (leftOff && rightOff)
 					continue; //fully connected, try next split line
-				if (leftBool)
-					leftOff = true; //if valid line, it is also a right edge
-				if (rightBool)
-					rightOff = true; //if valid line, it is also a left edge
 			}
 			//bottom edge case
 			if (test(img, x, limYmax)) {
-				boolean leftBool  = test(img, x - 1, limYmax) && test(img, x - 1, limYmax - 1);
-				boolean rightBool = test(img, x + 1, limYmax) && test(img, x + 1, limYmax - 1);
-				if (leftBool && rightBool)
-					continue;
-				if (leftBool)
-					leftOff = true; //if valid line, it is also a right edge
-				if (rightBool)
-					rightOff = true; //if valid line, it is also a left edge
+				leftOff |= test(img, x - 1, limYmax) && test(img, x - 1, limYmax - 1);
+				rightOff |= test(img, x + 1, limYmax) && test(img, x + 1, limYmax - 1);
+				if (leftOff && rightOff)
+					continue; //fully connected, try next split line
 			}
 			
 			//test the middle of the line
 			for (int y = limYmin + 1; y < limYmax; y++) {
 				if (test(img, x, y)) {
-					boolean leftBool  = adjV(img, x - 1, y);
-					boolean rightBool = adjV(img, x + 1, y);
-					if (leftBool && rightBool)
+					//if valid line, it is also a right edge
+					leftOff  |= adjV(img, x - 1, y);
+					//if valid line, it is also a left edge
+					rightOff |= adjV(img, x + 1, y);
+					if (leftOff && rightOff)
 						continue xLoop; //fully connected, try next split line
-					if (leftBool)
-						leftOff = true; //if valid line, it is also a right edge
-					if (rightBool)
-						rightOff = true; //if valid line, it is also a left edge
 				}
 			}
 			// valid split line, so split the rectangle and return results
@@ -108,48 +215,36 @@ public class BoundingBoxThing {
 			// Right side of half split, test all vertical lines till one doesn't go through a contour
 			boolean leftOff = false, rightOff = false;
 			if (test(img, x, limYmin)) {
-				boolean leftBool  = test(img, x - 1, limYmin) && test(img, x - 1, limYmin + 1);
-				boolean rightBool = test(img, x + 1, limYmin) && test(img, x + 1, limYmin + 1);
-				if (leftBool && rightBool)
-					continue;
-				if (leftBool)
-					leftOff = true; //if valid line, it is also a right edge
-				if (rightBool)
-					rightOff = true; //if valid line, it is also a left edge
+				leftOff |= test(img, x - 1, limYmin) && test(img, x - 1, limYmin + 1);
+				rightOff |= test(img, x + 1, limYmin) && test(img, x + 1, limYmin + 1);
+				if (leftOff && rightOff)
+					continue; //fully connected, try next split line
 			}
 			if (test(img, x, limYmax)) {
-				boolean leftBool  = test(img, x - 1, limYmax) && test(img, x - 1, limYmax - 1);
-				boolean rightBool = test(img, x + 1, limYmax) && test(img, x + 1, limYmax - 1);
-				if (leftBool && rightBool)
-					continue;
-				if (leftBool)
-					leftOff = true; //if valid line, it is also a right edge
-				if (rightBool)
-					rightOff = true; //if valid line, it is also a left edge
+				leftOff  |= test(img, x - 1, limYmax) && test(img, x - 1, limYmax - 1);
+				rightOff |= test(img, x + 1, limYmax) && test(img, x + 1, limYmax - 1);
+				if (leftOff && rightOff)
+					continue; //fully connected, try next split line
 			}
 			for (int y = limYmin + 1; y < limYmax; y++) {
 				if (test(img, x, y)) {
-					boolean leftBool  = adjV(img, x - 1, y);
-					boolean rightBool = adjV(img, x + 1, y);
-					if (leftBool && rightBool)
+					leftOff  |= adjV(img, x - 1, y);
+					rightOff |= adjV(img, x + 1, y);
+					if (leftOff && rightOff)
 						continue xLoop;
-					if (leftBool)
-						leftOff = true; //if valid line, it is also a right edge
-					if (rightBool)
-						rightOff = true; //if valid line, it is also a left edge
 				}
 			}
 			// valid split line, so split the rectangle and return results
 			// if leftOff, we found a right edge
-			return boundingBoxRecursive(img, bbr, limXmin, x - (leftOff ? 0 : 1), limYmin, limYmax, boundXmin, leftOff ? x : -1, -1, -1)
+			return boundingBoxRecursive(img, bbr, limXmin, leftOff ? x : (x - 1), limYmin, limYmax, boundXmin, leftOff ? x : -1, -1, -1)
 				// if rightOff, we found a left edge
-				| boundingBoxRecursive(img, bbr, x + (rightOff ? 0 : 1), limXmax, limYmin, limYmax, rightOff ? x : -1, boundXmax, -1, -1);
+				| boundingBoxRecursive(img, bbr, rightOff ? x : (x + 1), limXmax, limYmin, limYmax, rightOff ? x : -1, boundXmax, -1, -1);
 		}
 		// check for pixels on right edge of box
 		if (boundXmax != x && updateXbound(img, limYmin, limYmax, x, false))
 			boundXmax = x;
 		
-		int splitY = limYmin + (limYmax - limYmin) / 2;
+		final int splitY = limYmin + (limYmax - limYmin) / 2;
 		int y;
 		yLoop:
 		for (y = splitY; y > limYmin; y--) {
