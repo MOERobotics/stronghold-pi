@@ -14,7 +14,7 @@ public class BoundingBoxThing {
 	private static final int MIN_WIDTH = 40;
 	private static final int MIN_HEIGHT = 40;
 	
-	public static final int nextPowerOf2(final int value) {
+	private static final int nextPowerOf2(final int value) {
 		final int tmp = value - 1;
 		return (tmp >>> 16 | tmp >>> 8 | tmp >>> 4 | tmp >>> 2 | tmp >>> 1) + 1;
 	}
@@ -30,35 +30,19 @@ public class BoundingBoxThing {
 		if (width >= height) {
 			//Compute smallest power of two greater than width
 			int step = nextPowerOf2(width);
-			while (step > MIN_WIDTH) {
+			while (step > 2) {
 				//TODO optimize w/ bit twiddling
 				outer:
 				for (int split = xMin + (step / 2); split < xMax; split += step) {
 					for (int y = yMin; y < yMax; y++)
 						if (test(img, xMin + split, y))
 							continue outer;
-					return boundingBoxRecursive0(img, bbr, split, xMax, yMin, yMax) | boundingBoxRecursive0(img, bbr, xMin, split, yMin, yMax);
-				}
-				step /= 2;
-			}
-			while (step > 2) {
-				outer:
-				for (int split = xMin + (step / 2); split < xMax; split += step) {
-					for (int y = yMin; y < yMax; y++)
-						if (test(img, xMin + split, y))
-							continue outer;
-					boolean result = false;
-					if (split - xMin >= MIN_WIDTH)
-						//It's possible to create a box on the left side of the split
-						result |= boundingBoxRecursive0(img, bbr, split, xMax, yMin, yMax);
-					if (xMax - split >= MIN_WIDTH)
-						//It's possible to create a box on the right side of the split
-						result |= boundingBoxRecursive0(img, bbr, xMin, split, yMin, yMax);
-					return result;
+					return boundingBoxRecursive0(img, bbr, split + 1, xMax, yMin, yMax) | boundingBoxRecursive0(img, bbr, xMin, split - 1, yMin, yMax);
 				}
 				step /= 2;
 			}
 			//Complete for top/bottom
+			return boundingBoxRecursiveH(img, bbr, xMin, xMax, yMin, yMax);
 		}
 		int step = nextPowerOf2(height);
 		while (step > MIN_HEIGHT) {
@@ -67,10 +51,11 @@ public class BoundingBoxThing {
 				for (int x = 0; x < height; x++)
 					if (test(img, xMin + x, yMin + split))
 						continue outer;
-				return boundingBoxRecursive0(img, bbr, xMin, xMax, split, yMax) | boundingBoxRecursive0(img, bbr, xMin, xMax, yMin, split);
+				return boundingBoxRecursive0(img, bbr, xMin, xMax, split + 1, yMax) | boundingBoxRecursive0(img, bbr, xMin, xMax, yMin, split - 1);
 			}
 			step /= 2;
 		}
+		return boundingBoxRecursiveW(img, bbr, xMin, xMax, yMin, yMax);
 	}
 	/**
 	 * Called after the upper/lower bounds are known
@@ -82,7 +67,7 @@ public class BoundingBoxThing {
 	 * @param yMax
 	 * @return
 	 */
-	public static boolean boundingBoxRecursiveW(boolean[][] img, List<PreciseRectangle> bbr, final int xMin, final int xMax,
+	private static boolean boundingBoxRecursiveW(boolean[][] img, List<PreciseRectangle> bbr, final int xMin, final int xMax,
 			final int yMin, final int yMax) {
 		final int width = xMax - xMin;
 		final int height= yMax - yMin;
@@ -99,13 +84,14 @@ public class BoundingBoxThing {
 				for (int y = yMin; y < yMax; y++)
 					if (test(img, xMin + split, y))
 						continue outer;
-				return boundingBoxRecursive0(img, bbr, split, xMax, yMin, yMax) | boundingBoxRecursive0(img, bbr, xMin, split, yMin, yMax);
+				return boundingBoxRecursive0(img, bbr, split + 1, xMax, yMin, yMax) | boundingBoxRecursive0(img, bbr, xMin, split - 1, yMin, yMax);
 			}
 			step /= 2;
 		}
 		return bbr.add(new PreciseRectangle(xMin, xMax, yMin, yMax));
 	}
-	public static boolean boundingBoxRecursiveH(boolean[][] img, List<PreciseRectangle> bbr, final int xMin, final int xMax,
+	
+	private static boolean boundingBoxRecursiveH(boolean[][] img, List<PreciseRectangle> bbr, final int xMin, final int xMax,
 			final int yMin, final int yMax) {
 		final int width = xMax - xMin;
 		final int height= yMax - yMin;
@@ -122,7 +108,7 @@ public class BoundingBoxThing {
 				for (int x = xMin; x < xMax; x++)
 					if (test(img, x, yMin + split))
 						continue outer;
-				return boundingBoxRecursive0(img, bbr, split, xMax, yMin, yMax) | boundingBoxRecursive0(img, bbr, xMin, split, yMin, yMax);
+				return boundingBoxRecursive0(img, bbr, split + 1, xMax, yMin, yMax) | boundingBoxRecursive0(img, bbr, xMin, split - 1, yMin, yMax);
 			}
 			step /= 2;
 		}
