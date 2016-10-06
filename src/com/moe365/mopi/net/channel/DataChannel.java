@@ -1,10 +1,10 @@
 package com.moe365.mopi.net.channel;
 
+import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
 import com.moe365.mopi.net.packet.DataPacket;
 
@@ -110,6 +110,8 @@ public interface DataChannel {
 	 * @return
 	 */
 	<T extends DataPacket> CompletableFuture<T> sendPacketExpectResponse(DataPacket packet, DataChannelClient target, Duration timeout);
+	
+	DataPacket parseNext(ByteBuffer buf);
 
 	/**
 	 * Whether this channel is currently open.

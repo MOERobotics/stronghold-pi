@@ -4,6 +4,7 @@ import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 
+import com.moe365.mopi.net.impl.RandomlyBroadcastingChannel;
 import com.moe365.mopi.net.impl.WsDataSource;
 
 public class ServerController {
@@ -20,6 +21,8 @@ public class ServerController {
 	protected void addWsHandler() {
 		WsDataSource source = new WsDataSource();
 		final ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS|ServletContextHandler.NO_SECURITY);
+		RandomlyBroadcastingChannel ch = new RandomlyBroadcastingChannel(source);
+		source.registerChannel(ch);
 		context.setContextPath("/");
 		server.setHandler(context);
 		context.addServlet(new ServletHolder(source), "/");
