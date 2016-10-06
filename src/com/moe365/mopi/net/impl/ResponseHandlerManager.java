@@ -41,21 +41,23 @@ public class ResponseHandlerManager implements Runnable {
 		}
 		return MAX_CLEANUP_WAIT;
 	}
-	public void handle(DataChannelClient client, DataPacket packet) {
+	public boolean handle(DataChannelClient client, DataPacket packet) {
 		ResponseHandler handler = handlers.get(packet.getAckId());
 		if (handler != null) {
 			if (handler.getInvalidationTime().isAfter(Instant.now())) {
 				//Handler is invalid, so remove it.
 				handlers.remove(packet.getAckId());
 				queue.remove(handler);
-				return;
+				return false;
 			}
 			handler.onResponse(client, packet);
 			if (handler.doRemoveAfterResponse()) {
 				handlers.remove(packet.getAckId());
 				queue.remove(handler);
 			}
+			return true;
 		}
+		return false;
 	}
 	public void addHandler(ResponseHandler handler) {
 		handlers.put(handler.getId(), handler);
