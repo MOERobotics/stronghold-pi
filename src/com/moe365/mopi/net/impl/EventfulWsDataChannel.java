@@ -1,16 +1,20 @@
 package com.moe365.mopi.net.impl;
 
+import java.nio.ByteBuffer;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import com.moe365.mopi.net.channel.DataChannelClient;
+import com.moe365.mopi.net.channel.DataChannelDirection;
+import com.moe365.mopi.net.channel.DataChannelMediaType;
 import com.moe365.mopi.net.channel.EventfulDataChannel;
 import com.moe365.mopi.net.channel.UnsubscriptionReason;
 import com.moe365.mopi.net.packet.DataPacket;
 
 public class EventfulWsDataChannel extends AbstractWsDataChannel implements EventfulDataChannel {
 
+	
 	protected Set<Consumer<DataChannelClient>> subscriptionHandlers;
 	protected Set<BiConsumer<DataChannelClient, UnsubscriptionReason>> unsubscriptionHandlers;
 	protected Set<BiConsumer<DataPacket, DataChannelClient>> packetRecievedHandlers;
@@ -52,7 +56,7 @@ public class EventfulWsDataChannel extends AbstractWsDataChannel implements Even
 			handler.accept(client);
 		return true;
 	}
-
+	
 	@Override
 	protected void onRecievePacket(DataPacket packet, DataChannelClient client) {
 		for (BiConsumer<DataPacket, DataChannelClient> handler : this.packetRecievedHandlers)
@@ -64,4 +68,22 @@ public class EventfulWsDataChannel extends AbstractWsDataChannel implements Even
 		for (BiConsumer<DataChannelClient, UnsubscriptionReason> handler : this.unsubscriptionHandlers)
 			handler.accept(client, reason);
 	}
+	
+	@Override
+	public DataPacket parseNext(ByteBuffer buf) {
+		return null;
+	}
+
+	@Override
+	public DataChannelMediaType getType() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public DataChannelDirection getDirection() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
 }

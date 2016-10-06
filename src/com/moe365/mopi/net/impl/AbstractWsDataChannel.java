@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
@@ -29,8 +30,6 @@ public abstract class AbstractWsDataChannel implements DataChannel {
 	protected WsDataSource source;
 	protected int id;
 	protected String name;
-	protected DataChannelMediaType mediaType;
-	protected DataChannelDirection direction;
 	protected Set<WsClient> subscribers;
 
 	@Override
@@ -42,15 +41,9 @@ public abstract class AbstractWsDataChannel implements DataChannel {
 	public String getName() {
 		return this.name;
 	}
-
-	@Override
-	public DataChannelMediaType getType() {
-		return this.mediaType;
-	}
-
-	@Override
-	public DataChannelDirection getDirection() {
-		return this.direction;
+	
+	protected final void setId(int id) {
+		this.id = id;
 	}
 
 	@Override
@@ -128,9 +121,18 @@ public abstract class AbstractWsDataChannel implements DataChannel {
 	}
 
 	
-	protected abstract boolean onSubscription(DataChannelClient client);
+	protected boolean onSubscription(DataChannelClient client) {
+		this.subscribers.add((WsClient)client);
+		return true;
+	}
 	protected abstract void onRecievePacket(DataPacket packet, DataChannelClient client);
-	protected abstract void onUnsubscription(DataChannelClient client, UnsubscriptionReason reason);
+	protected void onUnsubscription(DataChannelClient client, UnsubscriptionReason reason) {
+		this.subscribers.remove(client);
+	}
+	
+	protected boolean isSubscriber(DataChannelClient client) {
+		return this.subscribers.contains(client);
+	}
 
 	@Override
 	public boolean isOpen() {
