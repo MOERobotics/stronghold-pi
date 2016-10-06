@@ -216,7 +216,7 @@ public class RoboRioClient implements Closeable {
 		} catch (SocketException e) {
 			e.printStackTrace();
 		}
-		System.out.println("ATTEMPT RESOLVE " + address);
+		System.out.println("ATTEMPT RESOLVE RAW " + addr + ":" + port);
 		executor.submit(() -> {
 			String host = addr;
 			int addrPort = 5801;
