@@ -70,7 +70,7 @@ public interface ErrorPacket extends DataPacket {
 			super.writeTo(buf)
 				.put((byte)code.ordinal());
 			//Somewhat faster to calculate it this way, b/c caching
-			byte[] msg = getMessage().getBytes(StandardCharsets.UTF_8);
+			byte[] msg = this.message == null ? new byte[0] : getMessage().getBytes(StandardCharsets.UTF_8);
 			buf.put((byte)(msg.length >> 12))
 				.putShort((short)(msg.length & 0xFF_FF))
 				.put(msg, 0, msg.length);
