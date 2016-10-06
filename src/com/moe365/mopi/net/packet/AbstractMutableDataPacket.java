@@ -16,8 +16,8 @@ public abstract class AbstractMutableDataPacket implements MutableDataPacket {
 	}
 
 	public AbstractMutableDataPacket(ByteBuffer buf) {
-		this.typeCode = buf.getShort() & 0xFF_FF;
 		this.channelId = buf.getShort() & 0xFF_FF;
+		this.typeCode = buf.getShort() & 0xFF_FF;
 		this.id = buf.getInt();
 		this.ackId = buf.getInt();
 	}
@@ -68,8 +68,8 @@ public abstract class AbstractMutableDataPacket implements MutableDataPacket {
 
 	@Override
 	public ByteBuffer writeTo(ByteBuffer buf) {
-		buf.putShort((short) getTypeCode());
 		buf.putShort((short) getChannelId());
+		buf.putShort((short) getTypeCode());
 		buf.putInt(getId());
 		buf.putInt(getAckId());
 		return buf;
@@ -77,16 +77,16 @@ public abstract class AbstractMutableDataPacket implements MutableDataPacket {
 
 	@Override
 	public void writeExternal(ObjectOutput out) throws IOException {
-		out.writeShort((short) getTypeCode());
 		out.writeShort((short) getChannelId());
+		out.writeShort((short) getTypeCode());
 		out.writeInt(getId());
 		out.writeInt(getAckId());
 	}
 
 	@Override
 	public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-		this.typeCode = in.readUnsignedShort();
 		this.channelId = in.readUnsignedShort();
+		this.typeCode = in.readUnsignedShort();
 		this.id = in.readInt();
 		this.ackId = in.readInt();
 	}

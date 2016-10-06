@@ -15,8 +15,8 @@ import java.nio.ByteBuffer;
  * @author mailmindlin
  */
 public interface DataPacket extends Externalizable {
-	public static final int TYPE_CODE_OFFSET = 0;
-	public static final int CHANNEL_ID_OFFSET = 2;
+	public static final int CHANNEL_ID_OFFSET = 0;
+	public static final int TYPE_CODE_OFFSET = 2;
 	public static final int PACKET_ID_OFFSET = 4;
 	public static final int ACK_PACKET_ID_OFFSET = 8;
 	@Deprecated
