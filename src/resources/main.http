@@ -154,7 +154,7 @@ Content-Type: text/html\r\n
 					}
 				});
 			}
-			if (window.location.hash.indexOf('sse')>-1)
+			if (window.location.hash.indexOf('nosse')<0)
 				beginSSE();
 			function updateOverlays(quiet) {
 				var w = cvs.width * .05;
