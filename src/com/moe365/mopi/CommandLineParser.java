@@ -45,7 +45,7 @@ public class CommandLineParser implements Serializable, Function<String[], Parse
 	/**
 	 * Constructor for deserialization
 	 */
-	protected CommandLineParser() {
+	public CommandLineParser() {
 		
 	}
 	
@@ -372,7 +372,7 @@ public class CommandLineParser implements Serializable, Function<String[], Parse
 		/**
 		 * Constructor for deserialization
 		 */
-		protected CommandLineAlias() {
+		public CommandLineAlias() {
 			
 		}
 		

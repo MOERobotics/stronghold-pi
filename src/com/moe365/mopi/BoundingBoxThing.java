@@ -49,8 +49,8 @@ public class BoundingBoxThing {
 		int ySplit = -2;
 		//It should be faster to calculate a split perpendicular to the widest axis
 		if (width >= height) {
-			if ((xSplit = splitV(img, xMin, xMax, yMin, yMax)) < 0)
-				ySplit = splitH(img, xMin, xMax, yMin, yMax);
+			if ((ySplit = splitH(img, xMin, xMax, yMin, yMax)) < 0)
+				xSplit = splitV(img, xMin, xMax, yMin, yMax);
 		} else {
 			if ((xSplit = splitV(img, xMin, xMax, yMin, yMax)) < 0)
 				ySplit = splitH(img, xMin, xMax, yMin, yMax);
@@ -75,8 +75,9 @@ public class BoundingBoxThing {
 		int step = nextPowerOf2(yMax - yMin);
 		while (step > 2) {
 			outer: for (int split = yMin + step / 2; split < yMax; split += step) {
+				boolean[] row = img[split];
 				for (int x = xMin; x < xMax; x++)
-					if (test(img, x, split))
+					if (row[x])
 						continue outer;
 				return split;
 			}
@@ -90,16 +91,12 @@ public class BoundingBoxThing {
 		while (step > 2) {
 			outer: for (int split = xMin + step / 2; split < xMax; split += step) {
 				for (int y = yMin; y < yMax; y++)
-					if (test(img, split, y))
+					if (img[y][split])
 						continue outer;
 				return split;
 			}
 			step /= 2;
 		}
 		return -1;
-	}
-
-	private static final boolean test(boolean[][] img, int x, int y) {
-		return img[y][x];
 	}
 }
