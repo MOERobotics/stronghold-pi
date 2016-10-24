@@ -92,33 +92,41 @@ public class RoboRioClient implements Closeable {
 	public static final short STATUS_YES_I_AM = 10;
 	public static final short STATUS_REQUEST_CONFIG = 11;
 	public static final short STATUS_CONFIG = 12;
-	
 	/**
 	 * 8 byte packet. Used for sending {@link #STATUS_NONE_FOUND} packets.
 	 */
-	protected DatagramPacket packet_8;
+	protected final DatagramPacket packet_8;
 	/**
 	 * 40 byte packet. Used for sending {@link #STATUS_ONE_FOUND} and
 	 * {@link #STATUS_ERROR} packets.
 	 */
-	protected DatagramPacket packet_40;
+	protected final DatagramPacket packet_40;
 	/**
 	 * 72 byte packet. Used for sending {@link #STATUS_TWO_FOUND} packets.
 	 */
-	protected DatagramPacket packet_72;
+	protected final DatagramPacket packet_72;
+	
+	protected final AtomicBoolean addressUpdated = new AtomicBoolean(false);
 	/**
-	 * RoboRIO's address
+	 * RoboRIO's address. May change as it is continually resolved
 	 */
-	protected SocketAddress address;
+	protected volatile SocketAddress address;
 	/**
-	 * UDP socket
+	 * UDP socket to send from
 	 */
-	protected DatagramSocket socket;
+	protected final DatagramSocket socket;
+	/**
+	 * Executor to run background tasks on
+	 */
 	protected final ExecutorService executor;
 	/**
-	 * The port that we are sending packets from (on the local machine)
+	 * The port that we are sending packets to (on the Rio)
 	 */
 	protected final int port;
+	/**
+	 * The Rio's hostname, to be resolved via mDNS
+	 */
+	protected final String hostname;
 	/**
 	 * Buffer backing packets
 	 */
@@ -128,6 +136,7 @@ public class RoboRioClient implements Closeable {
 	 * are recieved out of order. Always increasing.
 	 */
 	protected AtomicInteger packetNum = new AtomicInteger(0);
+	protected final MDNSListener resolver;
 	protected volatile boolean isResolved = false;
 	/**
 	 * Create a client with default settings
@@ -136,7 +145,7 @@ public class RoboRioClient implements Closeable {
 	 * @throws IOException 
 	 */
 	public RoboRioClient(ExecutorService executor) throws SocketException, IOException {
-		this(executor, RIO_PORT, new InetSocketAddress(RIO_ADDRESS, RIO_PORT));
+		this(executor, RIO_PORT, RIO_ADDRESS, RIO_PORT);
 	}
 	/**
 	 * 
@@ -146,8 +155,8 @@ public class RoboRioClient implements Closeable {
 	 * @throws SocketException
 	 * @throws IOException
 	 */
-	public RoboRioClient(ExecutorService executor, int port, SocketAddress addr) throws SocketException, IOException {
-		this(executor, RESOLVE_RETRY_TIME, port, addr);
+	public RoboRioClient(ExecutorService executor, int serverPort, String hostname, int rioPort) throws SocketException, IOException {
+		this(executor, RESOLVE_RETRY_TIME, serverPort, hostname, rioPort);
 	}
 	/**
 	 * 
@@ -157,8 +166,8 @@ public class RoboRioClient implements Closeable {
 	 * @throws SocketException
 	 * @throws IOException
 	 */
-	public RoboRioClient(ExecutorService executor, long resolveRetryTime, int port, SocketAddress addr) throws SocketException, IOException {
-		this(executor, resolveRetryTime, port, BUFFER_SIZE, addr);
+	public RoboRioClient(ExecutorService executor, long resolveRetryTime, int serverPort, String hostname, int rioPort) throws SocketException, IOException {
+		this(executor, resolveRetryTime, BUFFER_SIZE, serverPort, hostname, rioPort);
 	}
 	/**
 	 * 
@@ -169,87 +178,67 @@ public class RoboRioClient implements Closeable {
 	 * @throws SocketException if the socket could not be opened, or the socket could not bind to the specified local port.
 	 * @throws IOException 
 	 */
-	public RoboRioClient(ExecutorService executor, long resolveRetryTime, int port, int buffSize, SocketAddress addr) throws SocketException, IOException {
+	public RoboRioClient(ExecutorService executor, long resolveRetryTime, int buffSize, int serverPort, String hostname, int rioPort) throws SocketException, IOException {
 		this.executor = executor;
-		this.port = port;
-		this.address = addr;
+		this.port = rioPort;
 		this.buffer = ByteBuffer.allocate(buffSize);
-		System.out.println("Connecting to RIO: " + port + " | " + addr);
-		this.socket = new DatagramSocket(port);
+		this.socket = new DatagramSocket(serverPort);
+		this.hostname = hostname;
 		try {
 			socket.setTrafficClass(0x10);//Low delay
 		} catch (SocketException e) {
 			e.printStackTrace();
 		}
-		System.out.println("ATTEMPT RESOLVE " + address);
-		executor.submit(() -> {
-			while (!(this.isResolved || Thread.interrupted())) {
-				try {
-					//System.out.println(address.toString() + "|" + ((InetSocketAddress)address).isUnresolved());
-					this.packet_8 = new DatagramPacket(buffer.array(), 0, 8, address);
-					this.packet_40 = new DatagramPacket(buffer.array(), 0, 40, address);
-					this.packet_72 = new DatagramPacket(buffer.array(), 0, 72, address);
-					this.isResolved = true;
-					System.out.println("RESOLVED " + address);
-					return;
-				} catch (IllegalArgumentException e) {
-					System.err.println("UNABLE TO RESOLVE " + address + " (retry in " + resolveRetryTime + "ms)");
-				}
-				try {
-					Thread.sleep(resolveRetryTime);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-					return;
-				}
-				Thread.yield();
-			}
-		});
+		
+		this.packet_8  = new DatagramPacket(buffer.array(), 0, 8);
+		this.packet_40 = new DatagramPacket(buffer.array(), 0, 40);
+		this.packet_72 = new DatagramPacket(buffer.array(), 0, 72);
+		
+		//Handle the address resolution
+		this.isResolved = false;
+		this.address = null;
+		this.resolver = new MDNSListener();
+		this.resolver.setHandler(this::handleMdnsResponse);
+		executor.submit(this.resolver);
+		System.out.println("Resolving to RIO " + serverPort + " => @ " + hostname + ':' + rioPort);
 	}
-	public RoboRioClient(ExecutorService executor, long resolveRetryTime, int port, String addr) throws SocketException, IOException {
+	
+	public RoboRioClient(ExecutorService executor, long resolveRetryTime, int serverPort, SocketAddress addr) throws SocketException, IOException {
 		this.executor = executor;
-		this.port = port;
 		this.buffer = ByteBuffer.allocate(BUFFER_SIZE);
-		System.out.println("Connecting to RIO: " + port + " | " + addr);
-		this.socket = new DatagramSocket(port);
+		this.socket = new DatagramSocket(serverPort);
 		try {
 			socket.setTrafficClass(0x10);//Low delay
 		} catch (SocketException e) {
 			e.printStackTrace();
 		}
-		System.out.println("ATTEMPT RESOLVE " + address);
-		executor.submit(() -> {
-			String host = addr;
-			int addrPort = 5801;
-			if (host.contains(":")) {
-				int idx = host.lastIndexOf(':');
-				addrPort = Integer.valueOf(host.substring(idx + 1));
-				host = host.substring(0, idx);
-			}
-			while (!(this.isResolved || Thread.interrupted())) {
-				try {
-					//System.out.println(address.toString() + "|" + ((InetSocketAddress)address).isUnresolved());
-					InetAddress address = InetAddress.getByName(addr);
-					InetSocketAddress sAddr = new InetSocketAddress(address, addrPort);
-					this.packet_8 = new DatagramPacket(buffer.array(), 0, 8, sAddr);
-					this.packet_40 = new DatagramPacket(buffer.array(), 0, 40, sAddr);
-					this.packet_72 = new DatagramPacket(buffer.array(), 0, 72, sAddr);
-					this.address = sAddr;
-					this.isResolved = true;
-					System.out.println("RESOLVED " + sAddr);
-					return;
-				} catch (IllegalArgumentException | UnknownHostException e) {
-					System.err.println("UNABLE TO RESOLVE " + addr + " (retry in " + resolveRetryTime + "ms)");
-				}
-				try {
-					Thread.sleep(resolveRetryTime);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-					return;
-				}
-				Thread.yield();
-			}
-		});
+		this.packet_8  = new DatagramPacket(buffer.array(), 0, 8);
+		this.packet_40 = new DatagramPacket(buffer.array(), 0, 40);
+		this.packet_72 = new DatagramPacket(buffer.array(), 0, 72);
+		if (addr instanceof InetSocketAddress) {
+			//TODO finish
+			InetSocketAddress iAddr = (InetSocketAddress) addr;
+			this.port = iAddr.getPort();
+			this.hostname = iAddr.getHostName();
+			this.isResolved = !iAddr.isUnresolved();
+		} else {
+			this.port = -1;
+			this.hostname = null;
+			this.isResolved = true;
+		}
+		
+		if (this.isResolved) {
+			System.out.println("Connecting to RIO: " + serverPort + " => " + addr);
+			this.resolver = null;
+			this.address = addr;
+		} else {
+			System.out.println("Resolving to RIO " + serverPort + " => @ " + hostname + ':' + rioPort);
+			this.resolver = new MDNSListener();
+			this.resolver.setHandler(this::handleMdnsResponse);
+			executor.submit(this.resolver);
+		}
 	}
+	
 	protected void build(short status, short ack) {
 		buffer.position(0);
 		buffer.putInt(packetNum.getAndIncrement());
@@ -314,5 +303,37 @@ public class RoboRioClient implements Closeable {
 	@Override
 	public void close() throws IOException {
 		socket.close();
+	}
+	
+	public void sendQueries() {
+		DnsMessage query = DnsMessage.builder()
+			.setRecursionDesired(true)
+			.ask(DnsQuery.builder()
+			     .setName(hostname)
+			     .setClass(DnsClass.IN)
+			     .setType(DnsType.ANY)
+			     .build())
+			.build();
+		while (!Thread.interrupted()) {
+			try {
+				listener.sendMessage(query);
+			} catch (IOException e) {
+				e.printStackTrace();
+				break;
+			}
+			try {
+				Thread.sleep(RESOLVE_RETRY_TIME);
+			} catch (InterruptedException e) {
+				break;
+			}
+		}
+	}
+	
+	public void handleMdnsResponse(DnsMessage message) {
+		final DnsRecord[] answers = message.getAnswers();
+		for (int i = 0; i < answers.length; i++) {
+			DnsRecord answer = answers[i];
+			
+		}
 	}
 }
