@@ -38,8 +38,7 @@ public class BoundingBoxThing {
 	 * @param yMax Bottom bound
 	 * @return
 	 */
-	public static boolean boundingBox(boolean[][] img, List<PreciseRectangle> result, final int xMin, final int xMax,
-			final int yMin, final int yMax) {
+	public static boolean boundingBox(boolean[][] img, List<PreciseRectangle> result, final int xMin, final int xMax, final int yMin, final int yMax) {
 		int width = xMax - xMin;
 		int height= yMax - yMin;
 		if (width < MIN_WIDTH || height < MIN_HEIGHT)
@@ -59,7 +58,7 @@ public class BoundingBoxThing {
 			return boundingBox(img, result, xMin, xSplit - 1, yMin, yMax) | boundingBox(img, result, xSplit + 1, xMax, yMin, yMax);
 		if (ySplit >= 0)
 			return boundingBox(img, result, xMin, xMax, yMin, ySplit - 1) | boundingBox(img, result, xMin, xMax, ySplit + 1, yMax);
-		return result.add(new PreciseRectangle(xMin, xMax, yMin, yMax));
+		return result.add(new PreciseRectangle(xMin, yMin, xMax - xMin, yMax - yMin));
 	}
 	
 	/**
