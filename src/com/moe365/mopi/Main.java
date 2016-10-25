@@ -7,6 +7,8 @@ import java.io.ObjectInput;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
+import java.lang.Thread.UncaughtExceptionHandler;
+import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.util.Collections;
@@ -15,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.moe365.mopi.CommandLineParser.ParsedCommandLineArguments;
@@ -33,6 +36,7 @@ import com.pi4j.io.gpio.RaspiPin;
 import au.edu.jcu.v4l4j.CaptureCallback;
 import au.edu.jcu.v4l4j.Control;
 import au.edu.jcu.v4l4j.ControlList;
+import au.edu.jcu.v4l4j.FrameGrabber;
 import au.edu.jcu.v4l4j.ImagePalette;
 import au.edu.jcu.v4l4j.JPEGFrameGrabber;
 import au.edu.jcu.v4l4j.V4L4JConstants;
@@ -108,7 +112,21 @@ public class Main {
 		height = parsed.getOrDefault("--height", 480);
 		System.out.println("Frame size: " + width + "x" + height);
 		
-		final ExecutorService executor = Executors.newCachedThreadPool();
+		final ExecutorService executor = Executors.newCachedThreadPool(new ThreadFactory() {
+			@Override
+			public Thread newThread(Runnable r) {
+				Thread t = new Thread(r);
+				t.setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
+					@Override
+					public void uncaughtException(Thread t, Throwable e) {
+						System.err.println("Thread " + t + " had a problem");
+						e.printStackTrace();
+					}
+				});
+				return t;
+			}
+			
+		});
 		
 		final MJPEGServer server = initServer(parsed, executor);
 		
@@ -310,7 +328,7 @@ public class Main {
 		String address = args.getOrDefault("--udp-addr", RoboRioClient.RIO_ADDRESS);
 		System.out.println("Address: " + address);
 		try {
-			return new RoboRioClient(executor, retryTime, port, address);
+			return new RoboRioClient(executor, retryTime, port, address, port);
 		} catch (IOException e) {
 			//restrict scope of broken stuff
 			e.printStackTrace();
@@ -422,7 +440,9 @@ public class Main {
 			ControlList controls = camera.getControlList();
 			try {
 				controls.getControl("Exposure, Auto").setValue(2);
-			} catch (ControlException e) {}
+			} catch (ControlException e) {
+				e.printStackTrace();
+			}
 			controls.getControl("Exposure (Absolute)").setValue(156);
 			controls.getControl("Contrast").setValue(10);
 			controls.getControl("Saturation").setValue(83);
@@ -487,6 +507,12 @@ public class Main {
 			System.out.println("ERROR");
 			throw e;
 		}
+		Runtime.getRuntime().addShutdownHook(new Thread(()->{
+			device.releaseControlList();
+			device.releaseFrameGrabber();
+			System.out.println("Closing dev");
+			device.release(false);
+		}));
 		System.out.println("SUCCESS");
 		return device;
 	}
