@@ -416,37 +416,4 @@ public class RoboRioClient implements Closeable {
 		if (!addr.equals(this.address))
 			this.address = new InetSocketAddress(addr, this.rioPort);
 	}
-	
-	protected void handleMdnsResponses(DnsMessage message) {
-		if (!message.isResponse())
-			return;
-		System.out.println("Response: " + message);
-		InetAddress addr = null;
-		for (DnsRecord answer : message.getAnswers()) {
-			if ((!answer.getName().equals(this.rioHostname)) || !(answer.getType() == DnsType.A || answer.getType() == DnsType.AAAA))
-				continue;
-			addr = ((AddressRDATA)answer.getData()).getAddress();
-		}
-		System.out.println("Resolved to " + addr);
-		if (addr != null) {
-			synchronized (this.socketLock) {
-				this.address = new InetSocketAddress(addr, this.rioPort);
-				DatagramSocket socket = this.socket;
-				socket.disconnect();
-				socket.close();
-				try {
-					socket = new DatagramSocket(this.serverPort);
-					try {
-						socket.setTrafficClass(0x10);
-					} catch (SocketException e) {
-						//Ignore
-					}
-					this.socket = socket;
-					this.socket.connect(this.address);
-				} catch (SocketException e) {
-					e.printStackTrace();
-				}
-			}
-		}
-	}
 }

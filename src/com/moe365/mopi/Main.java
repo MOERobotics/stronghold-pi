@@ -7,6 +7,7 @@ import java.io.ObjectInput;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
+import java.lang.Thread.UncaughtExceptionHandler;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.util.Collections;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.moe365.mopi.CommandLineParser.ParsedCommandLineArguments;
@@ -73,7 +75,7 @@ public class Main {
 	 * Version string. Should be semantically versioned.
 	 * @see <a href="semver.org">semver.org</a>
 	 */
-	public static final String version = "0.3.4-alpha";
+	public static final String version = "0.4.0-alpha";
 	public static int width;
 	public static int height;
 	public static volatile boolean processorEnabled = true;
@@ -81,6 +83,7 @@ public class Main {
 	public static RoboRioClient rioClient;
 	public static JPEGFrameGrabber frameGrabber;
 	public static AbstractImageProcessor<?> processor;
+	
 	/**
 	 * Main entry point.
 	 * @param fred Command line arguments
@@ -108,7 +111,21 @@ public class Main {
 		height = parsed.getOrDefault("--height", 480);
 		System.out.println("Frame size: " + width + "x" + height);
 		
-		final ExecutorService executor = Executors.newCachedThreadPool();
+		final ExecutorService executor = Executors.newCachedThreadPool(new ThreadFactory() {
+			final UncaughtExceptionHandler handler = (t, e) -> {
+				System.err.println("Thread " + t + " had a problem");
+				e.printStackTrace();
+			};
+			@Override
+			public Thread newThread(Runnable r) {
+				Thread t = new Thread(r);
+				t.setName("stronghold-pi-" + t.getId());
+				//Print all exceptions to stderr
+				t.setUncaughtExceptionHandler(handler);
+				return t;
+			}
+			
+		});
 		
 		final MJPEGServer server = initServer(parsed, executor);
 		
@@ -187,6 +204,7 @@ public class Main {
 			fg.startCapture();
 		}
 	}
+	
 	protected static void testClient(RoboRioClient client) throws IOException, InterruptedException {
 		System.out.println("RUNNING TEST: CLIENT");
 		//just spews out UDP packets on a 3s loop
@@ -202,6 +220,7 @@ public class Main {
 			Thread.sleep(1000);
 		}
 	}
+	
 	protected static void testSSE(MJPEGServer server) throws InterruptedException {
 		System.out.println("RUNNING TEST: SSE");
 		while (true) {
@@ -216,6 +235,7 @@ public class Main {
 			Thread.sleep(1000);
 		}
 	}
+	
 	protected static void testControls(VideoDevice device) throws ControlException, UnsupportedMethod, StateException {
 		System.out.println("RUNNING TEST: CONTROLS");
 		ControlList controls = device.getControlList();
@@ -269,6 +289,7 @@ public class Main {
 		}
 		device.releaseControlList();
 	}
+	
 	/**
 	 * Initialize the GPIO, getting the pin that the LED is attached to.
 	 * @param args parsed command line arguments
@@ -296,13 +317,14 @@ public class Main {
 		pin.setState(false);//turn it off
 		return pin;
 	}
+	
 	protected static RoboRioClient initClient(ParsedCommandLineArguments args, ExecutorService executor) throws SocketException {
 		if (args.isFlagSet("--no-udp")) {
 			System.out.println("CLIENT DISABLED");
 			return null;
 		}
 		int port = args.getOrDefault("--udp-port", RoboRioClient.RIO_PORT);
-		int retryTime = args.getOrDefault("--mdns-resolve-retry", 5_000);
+		int retryTime = args.getOrDefault("--mdns-resolve-retry", RoboRioClient.RESOLVE_RETRY_TIME);
 		if (port < 0) {
 			System.out.println("CLIENT DISABLED");
 			return null;
@@ -310,7 +332,7 @@ public class Main {
 		String address = args.getOrDefault("--udp-addr", RoboRioClient.RIO_ADDRESS);
 		System.out.println("Address: " + address);
 		try {
-			return new RoboRioClient(executor, retryTime, port, address);
+			return new RoboRioClient(executor, retryTime, null, RoboRioClient.SERVER_PORT, address, port);
 		} catch (IOException e) {
 			//restrict scope of broken stuff
 			e.printStackTrace();
@@ -318,6 +340,7 @@ public class Main {
 			return null;
 		}
 	}
+	
 	protected static AbstractImageProcessor<?> initProcessor(ParsedCommandLineArguments args, final MJPEGServer httpServer, final RoboRioClient client) {
 		if (args.isFlagSet("--no-process"))
 			System.out.println("PROCESSOR DISABLED");
@@ -373,6 +396,7 @@ public class Main {
 			return processor;
 			//new ContourTracer(width, height, parsed.getOrDefault("--x-skip", 10), parsed.getOrDefault("--y-skip", 20));
 	}
+	
 	public static void enableProcessor() {
 		System.out.println("ENABLING CV");
 		if (processor == null) {
@@ -404,6 +428,7 @@ public class Main {
 		}
 		processorEnabled = true;
 	}
+	
 	/**
 	 * PEOPLEVISION(r)(tm): The only way for people to look at things (c)(sm)(r)
 	 * <p>
@@ -422,7 +447,9 @@ public class Main {
 			ControlList controls = camera.getControlList();
 			try {
 				controls.getControl("Exposure, Auto").setValue(2);
-			} catch (ControlException e) {}
+			} catch (ControlException e) {
+				e.printStackTrace();
+			}
 			controls.getControl("Exposure (Absolute)").setValue(156);
 			controls.getControl("Contrast").setValue(10);
 			controls.getControl("Saturation").setValue(83);
@@ -465,10 +492,12 @@ public class Main {
 		}
 		return null;
 	}
+	
 	protected static void testConverter(VideoDevice dev) {
 		@SuppressWarnings("unused")
 		JPEGEncoder encoder = JPEGEncoder.to(width, height, ImagePalette.YUYV);
 	}
+	
 	/**
 	 * Binds to and initializes the camera.
 	 * @param args parsed command line arguments
@@ -487,9 +516,16 @@ public class Main {
 			System.out.println("ERROR");
 			throw e;
 		}
+		Runtime.getRuntime().addShutdownHook(new Thread(()->{
+			device.releaseControlList();
+			device.releaseFrameGrabber();
+			System.out.println("Closing dev");
+			device.release(false);
+		}));
 		System.out.println("SUCCESS");
 		return device;
 	}
+	
 	/**
 	 * Loads the CommandLineParser from inside the JAR.
 	 * @return parser.
@@ -503,6 +539,7 @@ public class Main {
 		}
 		return buildParser();
 	}
+	
 	protected static CommandLineParser buildParser() {
 		CommandLineParser parser = CommandLineParser.builder()
 			.addFlag("--help", "Displays the help message and exits")
