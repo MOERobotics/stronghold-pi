@@ -117,7 +117,7 @@ public class RoboRioClient implements Closeable {
 	/**
 	 * UDP socket to datagrams from.
 	 */
-	protected final AtomicReference<DatagramSocket> socket = new AtomicReference<>(null);
+	protected final DatagramSocket socket;
 	
 	/**
 	 * Buffer backing packets.
@@ -202,7 +202,7 @@ public class RoboRioClient implements Closeable {
 			this.rioPort = -1;
 			this.rioHostname = null;
 		}
-		this.resetSocket();
+		this.socket = new DatagramSocket(this.serverPort);
 		System.out.println("Connecting to RIO: " + serverPort + " => " + addr);
 	}
 	
@@ -236,6 +236,7 @@ public class RoboRioClient implements Closeable {
 		this.resolveRetryTime = resolveRetryTime;
 		this.serverPort = serverPort;
 		this.netIf = netIf;
+		System.out.println("Using netIF " + netIf);
 		this.rioPort = rioPort;
 		try {
 			this.rioHostname = new FQDN(hostname);
@@ -247,27 +248,19 @@ public class RoboRioClient implements Closeable {
 		
 		//Handle the address resolution
 		this.address = null;
-		this.resetSocket();
 		this.mdnsListener.setHandler(this::handleMdnsResponse);
 		executor.submit(this.mdnsListener);
 		executor.submit(this::sendQueries);
+		this.socket = new DatagramSocket(null);
+		this.socket.setReuseAddress(true);
+		this.resetSocket();
 		System.out.println("Resolving to RIO " + serverPort + " => @ " + hostname + ':' + rioPort);
 	}
 	
 	protected void resetSocket() throws IOException {
-		DatagramSocket newSocket = new DatagramSocket();
-		try {
-			newSocket.setReuseAddress(true);
-			newSocket.bind(new InetSocketAddress(this.serverPort));
-		} catch (Exception e) {
-			//There was a problem binding the new socket,
-			//so close it before propagating the exception
-			newSocket.close();
-			throw e;
-		}
-		DatagramSocket oldSocket = this.socket.getAndSet(newSocket);
-		if (oldSocket != null)
-			oldSocket.close();
+		SocketAddress addr = new InetSocketAddress(this.serverPort);
+		this.socket.close();
+		this.socket.bind(addr);
 	}
 	
 	protected void build(short status, short ack) {
@@ -280,25 +273,26 @@ public class RoboRioClient implements Closeable {
 	
 	protected void send(ByteBuffer buffer) throws IOException {
 		SocketAddress address = this.address;
-		DatagramSocket socket = this.socket.get();
-		if (address == null || socket == null) {
+		synchronized (socket) {
+		if (address == null || !socket.isBound()) {
 			System.err.println("Dropped packet to Rio");
 			return;
 		}
 		DatagramPacket packet = new DatagramPacket(buffer.array(), buffer.position(), buffer.limit(), address);
 		try {
 			socket.send(packet);
+			System.out.println("Sent packet to Rio");
 		} catch (IOException e) {
 			this.resetSocket();
-			socket = this.socket.get();
 			SocketAddress addr2 = this.address;
-			if (socket == null || addr2 == null)
+			if (addr2 == null || !socket.isBound())
 				return;
 			if (addr2 != address)
 				//Can we just change the address w/o creating a new object?
 				packet = new DatagramPacket(buffer.array(), buffer.position(), buffer.limit(), addr2);
 			try {
 				socket.send(packet);
+				System.out.println("Sent packet to Rio");
 			} catch (Throwable t) {
 				t.printStackTrace();
 				throw t;
@@ -306,6 +300,7 @@ public class RoboRioClient implements Closeable {
 		} catch (Throwable t) {
 			t.printStackTrace();
 			throw t;
+		}
 		}
 	}
 	
@@ -372,9 +367,7 @@ public class RoboRioClient implements Closeable {
 	public void close() {
 		if (this.mdnsListener != null)
 			this.mdnsListener.close();
-		DatagramSocket socket = this.socket.getAndSet(null);
-		if (socket != null)
-			socket.close();
+		this.socket.close();
 	}
 	
 	public void sendQueries() {
@@ -387,6 +380,7 @@ public class RoboRioClient implements Closeable {
 			     .build())
 			.build();
 		while (!Thread.interrupted()) {
+			System.out.println("Querying mDNS for " + rioHostname);
 			try {
 				this.mdnsListener.sendMessage(query);
 			} catch (IOException e) {
@@ -414,6 +408,6 @@ public class RoboRioClient implements Closeable {
 		if (addr == null)
 			return;
 		if (!addr.equals(this.address))
-			this.address = new InetSocketAddress(addr, this.rioPort);
+			System.out.println("Resolved rio address to " + (this.address = new InetSocketAddress(addr, this.rioPort)));
 	}
 }

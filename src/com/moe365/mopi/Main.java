@@ -9,6 +9,7 @@ import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -320,23 +321,23 @@ public class Main {
 	
 	protected static RoboRioClient initClient(ParsedCommandLineArguments args, ExecutorService executor) throws SocketException {
 		if (args.isFlagSet("--no-udp")) {
-			System.out.println("CLIENT DISABLED");
+			System.out.println("CLIENT DISABLED (cli)");
 			return null;
 		}
 		int port = args.getOrDefault("--udp-port", RoboRioClient.RIO_PORT);
 		int retryTime = args.getOrDefault("--mdns-resolve-retry", RoboRioClient.RESOLVE_RETRY_TIME);
 		if (port < 0) {
-			System.out.println("CLIENT DISABLED");
+			System.out.println("CLIENT DISABLED (port)");
 			return null;
 		}
-		String address = args.getOrDefault("--udp-addr", RoboRioClient.RIO_ADDRESS);
+		String address = args.getOrDefault("--udp-target", RoboRioClient.RIO_ADDRESS);
 		System.out.println("Address: " + address);
 		try {
-			return new RoboRioClient(executor, retryTime, null, RoboRioClient.SERVER_PORT, address, port);
-		} catch (IOException e) {
+			return new RoboRioClient(executor, retryTime, NetworkInterface.getByName("eth0"), RoboRioClient.SERVER_PORT, address, port);
+		} catch (Exception e) {
 			//restrict scope of broken stuff
 			e.printStackTrace();
-			System.err.println("CLIENT DISABLED");
+			System.err.println("CLIENT DISABLED (error)");
 			return null;
 		}
 	}
