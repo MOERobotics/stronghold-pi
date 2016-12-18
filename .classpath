@@ -4,6 +4,7 @@
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/v4l4j"/>
 	<classpathentry kind="lib" path="lib/pi4j-1.0/lib/pi4j-core.jar" sourcepath="lib/pi4j-1.0/lib/pi4j-core-sources.jar"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/mdns4j"/>
 	<classpathentry kind="lib" path="lib/jetty/cdi-websocket-9.3.11.v20160721.jar"/>
 	<classpathentry kind="lib" path="lib/jetty/websocket/websocket-api-9.3.11.v20160721.jar"/>
 	<classpathentry kind="lib" path="lib/jetty/websocket/javax.websocket-api-1.0.jar">

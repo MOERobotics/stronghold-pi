@@ -7,7 +7,9 @@ import java.io.ObjectInput;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
+import java.lang.Thread.UncaughtExceptionHandler;
 import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -15,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.moe365.mopi.CommandLineParser.ParsedCommandLineArguments;
@@ -73,7 +76,7 @@ public class Main {
 	 * Version string. Should be semantically versioned.
 	 * @see <a href="semver.org">semver.org</a>
 	 */
-	public static final String version = "0.3.4-alpha";
+	public static final String version = "0.4.0-alpha";
 	public static int width;
 	public static int height;
 	public static volatile boolean processorEnabled = true;
@@ -81,6 +84,7 @@ public class Main {
 	public static RoboRioClient rioClient;
 	public static JPEGFrameGrabber frameGrabber;
 	public static AbstractImageProcessor<?> processor;
+	
 	/**
 	 * Main entry point.
 	 * @param fred Command line arguments
@@ -108,7 +112,21 @@ public class Main {
 		height = parsed.getOrDefault("--height", 480);
 		System.out.println("Frame size: " + width + "x" + height);
 		
-		final ExecutorService executor = Executors.newCachedThreadPool();
+		final ExecutorService executor = Executors.newCachedThreadPool(new ThreadFactory() {
+			final UncaughtExceptionHandler handler = (t, e) -> {
+				System.err.println("Thread " + t + " had a problem");
+				e.printStackTrace();
+			};
+			@Override
+			public Thread newThread(Runnable r) {
+				Thread t = new Thread(r);
+				t.setName("stronghold-pi-" + t.getId());
+				//Print all exceptions to stderr
+				t.setUncaughtExceptionHandler(handler);
+				return t;
+			}
+			
+		});
 		
 		final MJPEGServer server = initServer(parsed, executor);
 		
@@ -123,12 +141,11 @@ public class Main {
 		//The state of the LED. Used for timing.
 		final AtomicBoolean ledState = new AtomicBoolean(false);
 		
+		
+		// Run test, if required
 		if (parsed.isFlagSet("--test")) {
 			String target = parsed.get("--test");
 			switch (target) {
-				case "converter":
-					testConverter(device);
-					break;
 				case "controls":
 					testControls(device);
 					break;
@@ -187,6 +204,7 @@ public class Main {
 			fg.startCapture();
 		}
 	}
+	
 	protected static void testClient(RoboRioClient client) throws IOException, InterruptedException {
 		System.out.println("RUNNING TEST: CLIENT");
 		//just spews out UDP packets on a 3s loop
@@ -202,6 +220,7 @@ public class Main {
 			Thread.sleep(1000);
 		}
 	}
+	
 	protected static void testSSE(MJPEGServer server) throws InterruptedException {
 		System.out.println("RUNNING TEST: SSE");
 		while (true) {
@@ -216,6 +235,7 @@ public class Main {
 			Thread.sleep(1000);
 		}
 	}
+	
 	protected static void testControls(VideoDevice device) throws ControlException, UnsupportedMethod, StateException {
 		System.out.println("RUNNING TEST: CONTROLS");
 		ControlList controls = device.getControlList();
@@ -269,6 +289,7 @@ public class Main {
 		}
 		device.releaseControlList();
 	}
+	
 	/**
 	 * Initialize the GPIO, getting the pin that the LED is attached to.
 	 * @param args parsed command line arguments
@@ -296,83 +317,117 @@ public class Main {
 		pin.setState(false);//turn it off
 		return pin;
 	}
+	
+
+	/**
+	 * Initializes the UDP connector to the RoboRio.
+	 * 
+	 * @param args
+	 *            Command line arguments, containing flags that modify how the
+	 *            UDP connector is set up
+	 * @param executor
+	 *            Executor to run background tasks (such as asynchronous mDNS
+	 *            resolution)
+	 * @return Rio client, or null if disabled
+	 * @throws SocketException
+	 */
 	protected static RoboRioClient initClient(ParsedCommandLineArguments args, ExecutorService executor) throws SocketException {
 		if (args.isFlagSet("--no-udp")) {
-			System.out.println("CLIENT DISABLED");
+			System.out.println("CLIENT DISABLED (cli)");
 			return null;
 		}
 		int port = args.getOrDefault("--udp-port", RoboRioClient.RIO_PORT);
-		int retryTime = args.getOrDefault("--mdns-resolve-retry", 5_000);
+		int retryTime = args.getOrDefault("--mdns-resolve-retry", RoboRioClient.RESOLVE_RETRY_TIME);
 		if (port < 0) {
-			System.out.println("CLIENT DISABLED");
+			System.out.println("CLIENT DISABLED (port)");
 			return null;
 		}
-		String address = args.getOrDefault("--udp-addr", RoboRioClient.RIO_ADDRESS);
+		String address = args.getOrDefault("--udp-target", RoboRioClient.RIO_ADDRESS);
 		System.out.println("Address: " + address);
 		try {
-			return new RoboRioClient(executor, retryTime, port, address);
-		} catch (IOException e) {
+			return new RoboRioClient(executor, retryTime, NetworkInterface.getByName("eth0"), RoboRioClient.SERVER_PORT, address, port);
+		} catch (Exception e) {
 			//restrict scope of broken stuff
 			e.printStackTrace();
-			System.err.println("CLIENT DISABLED");
+			System.err.println("CLIENT DISABLED (error)");
 			return null;
 		}
 	}
+	
+	/**
+	 * Initialize the image processor
+	 * @param args
+	 * @param httpServer
+	 * @param client
+	 * @return Image proccessor to handle images, or null if disabled
+	 */
 	protected static AbstractImageProcessor<?> initProcessor(ParsedCommandLineArguments args, final MJPEGServer httpServer, final RoboRioClient client) {
-		if (args.isFlagSet("--no-process"))
+		if (args.isFlagSet("--no-process")) {
 			System.out.println("PROCESSOR DISABLED");
-			if (args.isFlagSet("--trace-contours")) {
-				ContourTracer processor = new ContourTracer(width, height, polygons -> {
-					for (Polygon polygon : polygons) {
-						System.out.println("=> " + polygon);
-						PointNode node = polygon.getStartingPoint();
-						// Scale
-						do {
-							node = node.set(node.getX() / width, node.getY() / height);
-						} while (!(node = node.next()).equals(polygon.getStartingPoint()));
-					}
-					if (httpServer != null)
-						httpServer.offerPolygons(polygons);
+			return null;
+		}
+		
+		if (args.isFlagSet("--trace-contours")) {
+			ContourTracer processor = new ContourTracer(width, height, polygons -> {
+				for (Polygon polygon : polygons) {
+					System.out.println("=> " + polygon);
+					PointNode node = polygon.getStartingPoint();
+					// Scale
+					do {
+						node = node.set(node.getX() / width, node.getY() / height);
+					} while (!(node = node.next()).equals(polygon.getStartingPoint()));
+				}
+				if (httpServer != null)
+					httpServer.offerPolygons(polygons);
+			});
+			Main.processor = processor;
+		} else {
+			ImageProcessor processor = new ImageProcessor(width, height, rectangles-> {
+				//Filter based on AR
+				rectangles.removeIf(rectangle-> {
+					double ar = rectangle.getHeight() / rectangle.getWidth();
+					return ar < .1 || ar > 10;
 				});
-				Main.processor = processor;
-			} else {
-				ImageProcessor processor = new ImageProcessor(width, height, rectangles-> {
-					//Filter based on AR
-					rectangles.removeIf(rectangle-> {
-						double ar = rectangle.getHeight() / rectangle.getWidth();
-						return ar < .1 || ar > 10;
-					});
-					//print the rectangles' dimensions to STDOUT
-					for (PreciseRectangle rectangle : rectangles)
-						System.out.println("=> " + rectangle);
-					
-					//send the largest rectangle(s) to the Rio
-					try {
-						if (client != null) {
-							if (rectangles.isEmpty()) {
-								client.writeNoneFound();
-							} else if (rectangles.size() == 1) {
-								client.writeOneFound(rectangles.get(0));
-							} else {
-								client.writeTwoFound(rectangles.get(0), rectangles.get(1));
-							}
+				//print the rectangles' dimensions to STDOUT
+				for (PreciseRectangle rectangle : rectangles)
+					System.out.println("=> " + rectangle);
+				
+				//send the largest rectangle(s) to the Rio
+				try {
+					if (client != null) {
+						if (rectangles.isEmpty()) {
+							client.writeNoneFound();
+						} else if (rectangles.size() == 1) {
+							client.writeOneFound(rectangles.get(0));
+						} else {
+							client.writeTwoFound(rectangles.get(0), rectangles.get(1));
 						}
-					} catch (IOException | NullPointerException e) {
-						e.printStackTrace();
 					}
-					//Offer the rectangles to be put in the SSE stream
-					if (httpServer != null)
-						httpServer.offerRectangles(rectangles);
-				});
-				if (args.isFlagSet("--save-diff"))
-					processor.saveDiff = true;
-				Main.processor = processor;
-			}
-			processor.start();
-			enableProcessor();
-			return processor;
-			//new ContourTracer(width, height, parsed.getOrDefault("--x-skip", 10), parsed.getOrDefault("--y-skip", 20));
+				} catch (IOException | NullPointerException e) {
+					e.printStackTrace();
+				}
+				//Offer the rectangles to be put in the SSE stream
+				if (httpServer != null)
+					httpServer.offerRectangles(rectangles);
+			});
+			if (args.isFlagSet("--save-diff"))
+				processor.saveDiff = true;
+			Main.processor = processor;
+		}
+		Main.processor.start();
+		enableProcessor();
+		return Main.processor;
 	}
+	
+
+	/**
+	 * COMPUTERVISION(c)(sm): For the embetterment of computers seeing things.
+	 * <p>
+	 * Adjusts camera settings to optimize the image processing algorithms.
+	 * Mostly just drops the exposure as low as possible, and plays around with
+	 * a few other controls.
+	 * </p>
+	 */
 	public static void enableProcessor() {
 		System.out.println("ENABLING CV");
 		if (processor == null) {
@@ -404,11 +459,18 @@ public class Main {
 		}
 		processorEnabled = true;
 	}
+	
 	/**
 	 * PEOPLEVISION(r)(tm): The only way for people to look at things (c)(sm)(r)
 	 * <p>
-	 * This 
-	 * @param server 
+	 * This revolutionary technology, when enabled, embetters the vision of
+	 * people looking at a LCD displaying a sequence of images transmitted over
+	 * a network from a robot with a webcam, by disabling the computer image
+	 * processing algorithms, and playing around with the camera's controls.
+	 * When this is enabled, <strong>no image processing will be done</strong>
+	 * </p>
+	 * 
+	 * @param server
 	 */
 	public static void disableProcessor(MJPEGServer server) {
 		System.out.println("DISABLING CV");
@@ -422,7 +484,9 @@ public class Main {
 			ControlList controls = camera.getControlList();
 			try {
 				controls.getControl("Exposure, Auto").setValue(2);
-			} catch (ControlException e) {}
+			} catch (ControlException e) {
+				e.printStackTrace();
+			}
 			controls.getControl("Exposure (Absolute)").setValue(156);
 			controls.getControl("Contrast").setValue(10);
 			controls.getControl("Saturation").setValue(83);
@@ -435,10 +499,13 @@ public class Main {
 		}
 		processorEnabled = false;
 	}
+	
 	/**
-	 * Set the JPEG quality from the camera. Tests have shown that this does <b>NOT</b> reduce the
-	 * MJPEG stream's bandwidth.
-	 * @param quality quality to set. Must be 0 to 100 (inclusive)
+	 * Set the JPEG quality from the camera. Tests have shown that this does
+	 * <b>NOT</b> reduce the MJPEG stream's bandwidth.
+	 * 
+	 * @param quality
+	 *            quality to set. Must be 0 to 100 (inclusive)
 	 */
 	public static void setQuality(int quality) {
 		if (frameGrabber == null)
@@ -446,6 +513,7 @@ public class Main {
 		System.out.println("SETTING QUALITY TO " + quality);
 		frameGrabber.setJPGQuality(quality);
 	}
+	
 	/**
 	 * Create and initialize the server
 	 * @param args the command line arguments
@@ -465,10 +533,7 @@ public class Main {
 		}
 		return null;
 	}
-	protected static void testConverter(VideoDevice dev) {
-		@SuppressWarnings("unused")
-		JPEGEncoder encoder = JPEGEncoder.to(width, height, ImagePalette.YUYV);
-	}
+	
 	/**
 	 * Binds to and initializes the camera.
 	 * @param args parsed command line arguments
@@ -487,9 +552,16 @@ public class Main {
 			System.out.println("ERROR");
 			throw e;
 		}
+		Runtime.getRuntime().addShutdownHook(new Thread(()->{
+			device.releaseControlList();
+			device.releaseFrameGrabber();
+			System.out.println("Closing dev");
+			device.release(false);
+		}));
 		System.out.println("SUCCESS");
 		return device;
 	}
+	
 	/**
 	 * Loads the CommandLineParser from inside the JAR.
 	 * @return parser.
@@ -503,6 +575,7 @@ public class Main {
 		}
 		return buildParser();
 	}
+	
 	protected static CommandLineParser buildParser() {
 		CommandLineParser parser = CommandLineParser.builder()
 			.addFlag("--help", "Displays the help message and exits")
@@ -512,7 +585,7 @@ public class Main {
 			.alias("-v", "--verbose")
 			.addFlag("--version", "Print the version string.")
 			.addFlag("--out", "Specify where to write log messages to (not implemented)")
-			.addKvPair("--test", "target", "Run test by name. Tests include 'converter', 'controls', 'client', and 'sse'.")
+			.addKvPair("--test", "target", "Run test by name. Tests include 'controls', 'client', and 'sse'.")
 			.addKvPair("--props", "file", "Specify the file to read properties from (not implemented)")
 			.addKvPair("--write-props", "file", "Write properties to file, which can be passed into the --props arg in the future (not implemented)")
 			.addFlag("--rebuild-parser", "Rebuilds the parser binary file")

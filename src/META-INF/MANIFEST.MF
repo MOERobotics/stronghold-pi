@@ -1,0 +1,3 @@
+Manifest-Version: 1.0
+Class-Path: . moepi_lib/junit-4.1.jar moepi_lib/pi4j-core.jar moepi_lib/mdns4j.jar v4l4j.jar
+Main-Class: com.moe365.mopi.Main
