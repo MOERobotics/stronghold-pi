@@ -25,37 +25,82 @@ import com.mindlin.mdns.rdata.AddressRDATA;
 import com.moe365.mopi.geom.PreciseRectangle;
 
 /**
- * UDP server to broadcast data at the RIO.
+ * UDP server to broadcast data at the RIO. <strong>Not</strong> thread safe.
  * <p>
- * All packets sent from this class start with a 32 bit unsigned integer
- * sequence number, which will always increase between consecutive packets.
- * Format of the UDP packets:
  * 
+ * <section id="header">
+ * <h2>Packet header format</h2>
  * <pre>
  *  0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  * |                          Sequence Number                      |
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- * |           Status code         |               ACK             |
+ * |           Status code         |              Flag             |
  * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
  * </pre>
  * <dl>
- * <dt>Sequence Number: 32 bits</dt>
- * <dd>The packet number, always increasing. If packet A is received with a
+ * <dt>Sequence Number</dt>
+ * <dd>32-bit packet number, always increasing. If packet A is received with a
  * sequence number of 5, then all future packets with sequence numbers under 5
- * may be discarded. This may be a timestamp</dd>
- * <dt>Status code: 16 bits</dt>
- * <dd>One of the following:
- * <ol start=0> <li>NOP</li> <li>NONE_FOUND</li> <li>ONE_FOUMD</li>
- * <li>TWO_FOUND</li> <li>GOODBYE</li> </ol> All other status codes are reserved
- * for future use. </dd> <dt>Flag: 8 bits</dt> <dd>Like a secondary status code,
- * it is used for stuff like QOS. If unused, set to 0. <table> <thead> <tr>
- * <th>#</th> <th>Name</th> <th>Description</th> </tr> </thead> <tbody> <tr>
- * <td>0</td> <td>Ping</td> <td>Sends a ping request. For latency
- * measurement</td> </tr> <tr> <td>1</td> <li>PING</li> <li>PONG</li>
- * <li>ARE_YOU_STILL_THERE</li> <li>YES_I_AM</li> </tbpdy> </table> </dd> </dl>
- * </p>
- * 
+ * may be discarded. Because this field is not assured to be consecutive, unix
+ * (or other) timestamps may be used, assuming no consecutive packets are sent
+ * within the same lowest resolution time unit. 
+ * </dd>
+ * <dt>Status code</dt>
+ * <dd>16-bit code indicating the intent of the packet. See <a href="#statusCodes">Status Codes</a>.</dd>
+ * <dt>Flag</dt>
+ * <dd>8-bit secondary status code, it is used for stuff like QOS. If unused,
+ * set to 0. See <a href="#flags">Flags</a>.
+ * </dd>
+ * </dl>
+ * </section>
+ * <section id="statusCodes">
+ * <h3>Status Codes</h3>
+ * A status code may be one of the following:
+ * <ol start="0">
+ * <li>{@linkplain #STATUS_NOP NOP}</li>
+ * <li>{@linkplain #STATUS_NONE_FOUND NONE_FOUND}</li>
+ * <li>{@linkplain #STATUS_ONE_FOUND ONE_FOUND}</li>
+ * <li>{@linkplain #STATUS_TWO_FOUND TWO_FOUND}</li>
+ * <li>{@linkplain #STATUS_ERROR ERROR}</li>
+ * <li>{@linkplain #STATUS_GOODBYE GOODBYE}</li>
+ * </ol>
+ * All other status codes are reserved for future use.
+ * </section>
+ * <section id="flags">
+ * <h3>Flags</h3>
+ * <table style="border:1px solid black;border-collapse:collapse;">
+ * <thead>
+ * <tr>
+ * <th style="text-align:left">#</th>
+ * <th style="text-align:left">Name</th>
+ * <th style="text-align:left">Description</th>
+ * </tr>
+ * </thead>
+ * <tbody>
+ * <tr>
+ * <td>0</td>
+ * <td>PING</td>
+ * <td>Sends a ping request. For latency measurement</td>
+ * </tr>
+ * <tr>
+ * <td>1</td>
+ * <td>PONG</td>
+ * <td>A response to a ping request</td>
+ * </tr>
+ * <tr>
+ * <td>2</td>
+ * <td>ARE_YOU_STILL_THERE</td>
+ * <td></td>
+ * </tr>
+ * <tr>
+ * <td>3</td>
+ * <td>YES_I_AM</td>
+ * <td></td>
+ * </tr>
+ * </tbody>
+ * </table>
+ * </section>
  * @author mailmindlin
  */
 public class RoboRioClient implements Closeable {
@@ -75,8 +120,8 @@ public class RoboRioClient implements Closeable {
 	public static final String RIO_ADDRESS = "roboRIO-365-FRC.local";
 	
 	/**
-	 * Denotes a packet that should be ignored. No idea why we would need
-	 * to use this, though.
+	 * Denotes a packet that should be ignored. No idea why we would need to use
+	 * this, though.
 	 */
 	public static final short STATUS_NOP = 0;
 	/**
@@ -84,14 +129,14 @@ public class RoboRioClient implements Closeable {
 	 */
 	public static final short STATUS_NONE_FOUND = 1;
 	/**
-	 * Denotes a packet telling the Rio that one target has been
-	 * detected. The position data MUST be included in the packet.
+	 * Denotes a packet telling the Rio that one target has been detected. The
+	 * position data MUST be included in the packet.
 	 */
 	public static final short STATUS_ONE_FOUND = 2;
 	/**
-	 * Denotes a packet telling the Rio that two or more targets
-	 * have been found. The position data of the two largest targets
-	 * found (by area) MUST be included in the packet. 
+	 * Denotes a packet telling the Rio that two or more targets have been
+	 * found. The position data of the two largest targets found (by area) MUST
+	 * be included in the packet.
 	 */
 	public static final short STATUS_TWO_FOUND = 3;
 	public static final short STATUS_ERROR = 4;
@@ -165,7 +210,7 @@ public class RoboRioClient implements Closeable {
 	/**
 	 * Create a client with default settings, which will continually resolve the Rio's address via mDNS.
 	 * @throws SocketException 
-	 * @throws IOException 
+	 * @throws IOException
 	 */
 	public RoboRioClient() throws SocketException, IOException {
 		this(new InetSocketAddress(RIO_ADDRESS, RIO_PORT));
@@ -174,7 +219,6 @@ public class RoboRioClient implements Closeable {
 	public RoboRioClient(SocketAddress addr) throws SocketException, IOException {
 		this(SERVER_PORT, addr);
 	}
-	
 	/**
 	 * Create a client that WILL NOT resolve the passed address via mDNS
 	 * @param serverPort 
@@ -224,12 +268,15 @@ public class RoboRioClient implements Closeable {
 	
 	/**
 	 * 
-	 * @param executor 
+	 * @param executor
 	 * @param port
 	 * @param buffSize
 	 * @param addr
-	 * @throws SocketException if the socket could not be opened, or the socket could not bind to the specified local port.
-	 * @throws IOException 
+	 * @throws SocketException
+	 *             if the socket could not be opened, or the socket could not
+	 *             bind to the specified local port.
+	 * @throws SecurityException
+	 *             If this program is not allowed to connect to the given socket
 	 */
 	public RoboRioClient(ExecutorService executor, long resolveRetryTime, NetworkInterface netIf, int serverPort, String hostname, int rioPort) throws SocketException, IOException {
 		this.executor = executor;
@@ -268,7 +315,7 @@ public class RoboRioClient implements Closeable {
 		buffer.limit(buffer.capacity());
 		buffer.putInt(packetNum.getAndIncrement());
 		buffer.putShort(status);
-		buffer.putShort(ack);
+		buffer.putShort(flag);
 	}
 	
 	protected void send(ByteBuffer buffer) throws IOException {
@@ -355,7 +402,7 @@ public class RoboRioClient implements Closeable {
 	public void writeError(long errorCode) throws IOException {
 		build(STATUS_ERROR, (short)0);
 		buffer.putLong(errorCode);
-		//Pad with 0s
+		// Pad with 0s
 		buffer.putLong(0);
 		buffer.putLong(0);
 		buffer.putLong(0);

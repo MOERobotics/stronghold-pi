@@ -141,6 +141,8 @@ public class Main {
 		//The state of the LED. Used for timing.
 		final AtomicBoolean ledState = new AtomicBoolean(false);
 		
+		
+		// Run test, if required
 		if (parsed.isFlagSet("--test")) {
 			String target = parsed.get("--test");
 			switch (target) {
@@ -316,6 +318,19 @@ public class Main {
 		return pin;
 	}
 	
+
+	/**
+	 * Initializes the UDP connector to the RoboRio.
+	 * 
+	 * @param args
+	 *            Command line arguments, containing flags that modify how the
+	 *            UDP connector is set up
+	 * @param executor
+	 *            Executor to run background tasks (such as asynchronous mDNS
+	 *            resolution)
+	 * @return Rio client, or null if disabled
+	 * @throws SocketException
+	 */
 	protected static RoboRioClient initClient(ParsedCommandLineArguments args, ExecutorService executor) throws SocketException {
 		if (args.isFlagSet("--no-udp")) {
 			System.out.println("CLIENT DISABLED (cli)");
@@ -339,62 +354,80 @@ public class Main {
 		}
 	}
 	
+	/**
+	 * Initialize the image processor
+	 * @param args
+	 * @param httpServer
+	 * @param client
+	 * @return Image proccessor to handle images, or null if disabled
+	 */
 	protected static AbstractImageProcessor<?> initProcessor(ParsedCommandLineArguments args, final MJPEGServer httpServer, final RoboRioClient client) {
-		if (args.isFlagSet("--no-process"))
+		if (args.isFlagSet("--no-process")) {
 			System.out.println("PROCESSOR DISABLED");
-			if (args.isFlagSet("--trace-contours")) {
-				ContourTracer processor = new ContourTracer(width, height, polygons -> {
-					for (Polygon polygon : polygons) {
-						System.out.println("=> " + polygon);
-						PointNode node = polygon.getStartingPoint();
-						// Scale
-						do {
-							node = node.set(node.getX() / width, node.getY() / height);
-						} while (!(node = node.next()).equals(polygon.getStartingPoint()));
-					}
-					if (httpServer != null)
-						httpServer.offerPolygons(polygons);
+			return null;
+		}
+		
+		if (args.isFlagSet("--trace-contours")) {
+			ContourTracer processor = new ContourTracer(width, height, polygons -> {
+				for (Polygon polygon : polygons) {
+					System.out.println("=> " + polygon);
+					PointNode node = polygon.getStartingPoint();
+					// Scale
+					do {
+						node = node.set(node.getX() / width, node.getY() / height);
+					} while (!(node = node.next()).equals(polygon.getStartingPoint()));
+				}
+				if (httpServer != null)
+					httpServer.offerPolygons(polygons);
+			});
+			Main.processor = processor;
+		} else {
+			ImageProcessor processor = new ImageProcessor(width, height, rectangles-> {
+				//Filter based on AR
+				rectangles.removeIf(rectangle-> {
+					double ar = rectangle.getHeight() / rectangle.getWidth();
+					return ar < .1 || ar > 10;
 				});
-				Main.processor = processor;
-			} else {
-				ImageProcessor processor = new ImageProcessor(width, height, rectangles-> {
-					//Filter based on AR
-					rectangles.removeIf(rectangle-> {
-						double ar = rectangle.getHeight() / rectangle.getWidth();
-						return ar < .1 || ar > 10;
-					});
-					//print the rectangles' dimensions to STDOUT
-					for (PreciseRectangle rectangle : rectangles)
-						System.out.println("=> " + rectangle);
-					
-					//send the largest rectangle(s) to the Rio
-					try {
-						if (client != null) {
-							if (rectangles.isEmpty()) {
-								client.writeNoneFound();
-							} else if (rectangles.size() == 1) {
-								client.writeOneFound(rectangles.get(0));
-							} else {
-								client.writeTwoFound(rectangles.get(0), rectangles.get(1));
-							}
+				//print the rectangles' dimensions to STDOUT
+				for (PreciseRectangle rectangle : rectangles)
+					System.out.println("=> " + rectangle);
+				
+				//send the largest rectangle(s) to the Rio
+				try {
+					if (client != null) {
+						if (rectangles.isEmpty()) {
+							client.writeNoneFound();
+						} else if (rectangles.size() == 1) {
+							client.writeOneFound(rectangles.get(0));
+						} else {
+							client.writeTwoFound(rectangles.get(0), rectangles.get(1));
 						}
-					} catch (IOException | NullPointerException e) {
-						e.printStackTrace();
 					}
-					//Offer the rectangles to be put in the SSE stream
-					if (httpServer != null)
-						httpServer.offerRectangles(rectangles);
-				});
-				if (args.isFlagSet("--save-diff"))
-					processor.saveDiff = true;
-				Main.processor = processor;
-			}
-			processor.start();
-			enableProcessor();
-			return processor;
-			//new ContourTracer(width, height, parsed.getOrDefault("--x-skip", 10), parsed.getOrDefault("--y-skip", 20));
+				} catch (IOException | NullPointerException e) {
+					e.printStackTrace();
+				}
+				//Offer the rectangles to be put in the SSE stream
+				if (httpServer != null)
+					httpServer.offerRectangles(rectangles);
+			});
+			if (args.isFlagSet("--save-diff"))
+				processor.saveDiff = true;
+			Main.processor = processor;
+		}
+		Main.processor.start();
+		enableProcessor();
+		return Main.processor;
 	}
 	
+
+	/**
+	 * COMPUTERVISION(c)(sm): For the embetterment of computers seeing things.
+	 * <p>
+	 * Adjusts camera settings to optimize the image processing algorithms.
+	 * Mostly just drops the exposure as low as possible, and plays around with
+	 * a few other controls.
+	 * </p>
+	 */
 	public static void enableProcessor() {
 		System.out.println("ENABLING CV");
 		if (processor == null) {
@@ -430,8 +463,14 @@ public class Main {
 	/**
 	 * PEOPLEVISION(r)(tm): The only way for people to look at things (c)(sm)(r)
 	 * <p>
-	 * This 
-	 * @param server 
+	 * This revolutionary technology, when enabled, embetters the vision of
+	 * people looking at a LCD displaying a sequence of images transmitted over
+	 * a network from a robot with a webcam, by disabling the computer image
+	 * processing algorithms, and playing around with the camera's controls.
+	 * When this is enabled, <strong>no image processing will be done</strong>
+	 * </p>
+	 * 
+	 * @param server
 	 */
 	public static void disableProcessor(MJPEGServer server) {
 		System.out.println("DISABLING CV");
@@ -460,10 +499,13 @@ public class Main {
 		}
 		processorEnabled = false;
 	}
+	
 	/**
-	 * Set the JPEG quality from the camera. Tests have shown that this does <b>NOT</b> reduce the
-	 * MJPEG stream's bandwidth.
-	 * @param quality quality to set. Must be 0 to 100 (inclusive)
+	 * Set the JPEG quality from the camera. Tests have shown that this does
+	 * <b>NOT</b> reduce the MJPEG stream's bandwidth.
+	 * 
+	 * @param quality
+	 *            quality to set. Must be 0 to 100 (inclusive)
 	 */
 	public static void setQuality(int quality) {
 		if (frameGrabber == null)
@@ -471,6 +513,7 @@ public class Main {
 		System.out.println("SETTING QUALITY TO " + quality);
 		frameGrabber.setJPGQuality(quality);
 	}
+	
 	/**
 	 * Create and initialize the server
 	 * @param args the command line arguments
