@@ -270,7 +270,7 @@ public class MJPEGServer implements Runnable {
 		if (jsonSSEChannels.size() == 0)
 			//Don't waste time on building the data, if nobody's there to listen
 			return;
-		StringBuffer sb = new StringBuffer("event: udrects\r\ndata: [");
+		StringBuilder sb = new StringBuilder("event: udrects\r\ndata: [");
 		if (rectangles != null && (!rectangles.isEmpty())) {
 			for (PreciseRectangle rectangle : rectangles) {
 				sb.append("[0,")
@@ -294,7 +294,7 @@ public class MJPEGServer implements Runnable {
 		if (jsonSSEChannels.size() == 0)
 			//Don't waste time on building the data, if nobody's there to listen
 			return;
-		StringBuffer sb = new StringBuffer("event: udrects\r\ndata: [");
+		StringBuilder sb = new StringBuilder("event: udrects\r\ndata: [");
 		if (polygons != null && (!polygons.isEmpty())) {
 			for (Polygon polygon : polygons) {
 				sb.append("[1,");

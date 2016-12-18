@@ -5,10 +5,10 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
-import java.nio.ByteBuffer;
 import java.util.Comparator;
 import java.util.function.Function;
 
+import com.moe365.mopi.util.NumberUtils;
 import com.moe365.mopi.util.ReflectionUtils;
 
 /**
@@ -122,14 +122,27 @@ public class PreciseRectangle implements Externalizable {
 	@Override
 	public int hashCode() {
 		if (hash == 0) {
-			ByteBuffer buf = ByteBuffer.allocate(32);
-			buf.putDouble(getX());
-			buf.putDouble(getY());
-			buf.putDouble(getWidth());
-			buf.putDouble(getHeight());
-			hash = buf.hashCode();
+			final long v = (((31 + Double.doubleToLongBits(getX())) * 31
+					+ Double.doubleToLongBits(getY())) * 31
+					+ Double.doubleToLongBits(getWidth())) * 31
+					+ Double.doubleToLongBits(getHeight());
+			hash = (int) ((v >>> 32) ^ (v & 0xFFFF_FFFF));
 		}
 		return hash;
+	}
+	
+	@Override
+	public boolean equals(Object o) {
+		if (this == o)
+			return true;
+		if (o instanceof PreciseRectangle) {
+			PreciseRectangle other = (PreciseRectangle) o;
+			return NumberUtils.sortaEqual(getX(), other.getX())
+					&& NumberUtils.sortaEqual(getY(), other.getY())
+					&& NumberUtils.sortaEqual(getWidth(), other.getWidth())
+					&& NumberUtils.sortaEqual(getHeight(), other.getHeight());
+		}
+		return false;
 	}
 	
 	@Override

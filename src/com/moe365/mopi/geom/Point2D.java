@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 
+import com.moe365.mopi.util.NumberUtils;
 import com.moe365.mopi.util.ReflectionUtils;
 
 /**
@@ -154,7 +155,8 @@ public class Point2D implements Externalizable, Cloneable {
 			return true;
 		if (other instanceof Point2D) {
 			Point2D otherPt = (Point2D) other;
-			return otherPt.getX() == getX() && otherPt.getY() == getY();
+			return NumberUtils.sortaEqual(getX(), otherPt.getX())
+					&& NumberUtils.sortaEqual(getY(), otherPt.getY());
 		}
 		return false;
 	}

@@ -7,7 +7,9 @@ import java.io.ObjectInput;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
+import java.lang.Thread.UncaughtExceptionHandler;
 import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -15,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.moe365.mopi.CommandLineParser.ParsedCommandLineArguments;
@@ -73,7 +76,7 @@ public class Main {
 	 * Version string. Should be semantically versioned.
 	 * @see <a href="semver.org">semver.org</a>
 	 */
-	public static final String version = "0.3.4-alpha";
+	public static final String version = "0.4.0-alpha";
 	public static int width;
 	public static int height;
 	public static volatile boolean processorEnabled = true;
@@ -81,6 +84,7 @@ public class Main {
 	public static RoboRioClient rioClient;
 	public static JPEGFrameGrabber frameGrabber;
 	public static AbstractImageProcessor<?> processor;
+	
 	/**
 	 * Main entry point.
 	 * @param fred Command line arguments
@@ -108,8 +112,21 @@ public class Main {
 		height = parsed.getOrDefault("--height", 480);
 		System.out.println("Frame size: " + width + "x" + height);
 		
-		// Initialize components
-		final ExecutorService executor = Executors.newCachedThreadPool();
+		final ExecutorService executor = Executors.newCachedThreadPool(new ThreadFactory() {
+			final UncaughtExceptionHandler handler = (t, e) -> {
+				System.err.println("Thread " + t + " had a problem");
+				e.printStackTrace();
+			};
+			@Override
+			public Thread newThread(Runnable r) {
+				Thread t = new Thread(r);
+				t.setName("stronghold-pi-" + t.getId());
+				//Print all exceptions to stderr
+				t.setUncaughtExceptionHandler(handler);
+				return t;
+			}
+			
+		});
 		
 		final MJPEGServer server = initServer(parsed, executor);
 		
@@ -129,9 +146,6 @@ public class Main {
 		if (parsed.isFlagSet("--test")) {
 			String target = parsed.get("--test");
 			switch (target) {
-				case "converter":
-					testConverter(device);
-					break;
 				case "controls":
 					testControls(device);
 					break;
@@ -304,6 +318,7 @@ public class Main {
 		return pin;
 	}
 	
+
 	/**
 	 * Initializes the UDP connector to the RoboRio.
 	 * 
@@ -318,23 +333,23 @@ public class Main {
 	 */
 	protected static RoboRioClient initClient(ParsedCommandLineArguments args, ExecutorService executor) throws SocketException {
 		if (args.isFlagSet("--no-udp")) {
-			System.out.println("CLIENT DISABLED");
+			System.out.println("CLIENT DISABLED (cli)");
 			return null;
 		}
 		int port = args.getOrDefault("--udp-port", RoboRioClient.RIO_PORT);
-		int retryTime = args.getOrDefault("--mdns-resolve-retry", 5_000);
+		int retryTime = args.getOrDefault("--mdns-resolve-retry", RoboRioClient.RESOLVE_RETRY_TIME);
 		if (port < 0) {
-			System.out.println("CLIENT DISABLED");
+			System.out.println("CLIENT DISABLED (port)");
 			return null;
 		}
-		String address = args.getOrDefault("--udp-addr", RoboRioClient.RIO_ADDRESS);
+		String address = args.getOrDefault("--udp-target", RoboRioClient.RIO_ADDRESS);
 		System.out.println("Address: " + address);
 		try {
-			return new RoboRioClient(executor, retryTime, port, address);
-		} catch (IOException e) {
+			return new RoboRioClient(executor, retryTime, NetworkInterface.getByName("eth0"), RoboRioClient.SERVER_PORT, address, port);
+		} catch (Exception e) {
 			//restrict scope of broken stuff
 			e.printStackTrace();
-			System.err.println("CLIENT DISABLED");
+			System.err.println("CLIENT DISABLED (error)");
 			return null;
 		}
 	}
@@ -404,6 +419,7 @@ public class Main {
 		return Main.processor;
 	}
 	
+
 	/**
 	 * COMPUTERVISION(c)(sm): For the embetterment of computers seeing things.
 	 * <p>
@@ -468,7 +484,9 @@ public class Main {
 			ControlList controls = camera.getControlList();
 			try {
 				controls.getControl("Exposure, Auto").setValue(2);
-			} catch (ControlException e) {}
+			} catch (ControlException e) {
+				e.printStackTrace();
+			}
 			controls.getControl("Exposure (Absolute)").setValue(156);
 			controls.getControl("Contrast").setValue(10);
 			controls.getControl("Saturation").setValue(83);
@@ -516,11 +534,6 @@ public class Main {
 		return null;
 	}
 	
-	protected static void testConverter(VideoDevice dev) {
-		@SuppressWarnings("unused")
-		JPEGEncoder encoder = JPEGEncoder.to(width, height, ImagePalette.YUYV);
-	}
-	
 	/**
 	 * Binds to and initializes the camera.
 	 * @param args parsed command line arguments
@@ -539,6 +552,12 @@ public class Main {
 			System.out.println("ERROR");
 			throw e;
 		}
+		Runtime.getRuntime().addShutdownHook(new Thread(()->{
+			device.releaseControlList();
+			device.releaseFrameGrabber();
+			System.out.println("Closing dev");
+			device.release(false);
+		}));
 		System.out.println("SUCCESS");
 		return device;
 	}
@@ -566,7 +585,7 @@ public class Main {
 			.alias("-v", "--verbose")
 			.addFlag("--version", "Print the version string.")
 			.addFlag("--out", "Specify where to write log messages to (not implemented)")
-			.addKvPair("--test", "target", "Run test by name. Tests include 'converter', 'controls', 'client', and 'sse'.")
+			.addKvPair("--test", "target", "Run test by name. Tests include 'controls', 'client', and 'sse'.")
 			.addKvPair("--props", "file", "Specify the file to read properties from (not implemented)")
 			.addKvPair("--write-props", "file", "Write properties to file, which can be passed into the --props arg in the future (not implemented)")
 			.addFlag("--rebuild-parser", "Rebuilds the parser binary file")
