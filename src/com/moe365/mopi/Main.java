@@ -144,9 +144,6 @@ public class Main {
 		if (parsed.isFlagSet("--test")) {
 			String target = parsed.get("--test");
 			switch (target) {
-				case "converter":
-					testConverter(device);
-					break;
 				case "controls":
 					testControls(device);
 					break;
@@ -494,11 +491,6 @@ public class Main {
 		return null;
 	}
 	
-	protected static void testConverter(VideoDevice dev) {
-		@SuppressWarnings("unused")
-		JPEGEncoder encoder = JPEGEncoder.to(width, height, ImagePalette.YUYV);
-	}
-	
 	/**
 	 * Binds to and initializes the camera.
 	 * @param args parsed command line arguments
@@ -550,7 +542,7 @@ public class Main {
 			.alias("-v", "--verbose")
 			.addFlag("--version", "Print the version string.")
 			.addFlag("--out", "Specify where to write log messages to (not implemented)")
-			.addKvPair("--test", "target", "Run test by name. Tests include 'converter', 'controls', 'client', and 'sse'.")
+			.addKvPair("--test", "target", "Run test by name. Tests include 'controls', 'client', and 'sse'.")
 			.addKvPair("--props", "file", "Specify the file to read properties from (not implemented)")
 			.addKvPair("--write-props", "file", "Write properties to file, which can be passed into the --props arg in the future (not implemented)")
 			.addFlag("--rebuild-parser", "Rebuilds the parser binary file")
