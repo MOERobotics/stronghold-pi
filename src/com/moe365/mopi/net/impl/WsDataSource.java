@@ -171,7 +171,9 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 					UnsubscriptionReason[] reasons = unsubscribePacket.getReasons();
 					for (int i = 0; i < ids.length; i++) {
 						AbstractWsDataChannel channel = channels.get(ids[i]);
-						//TODO handle INVALID_CHANNEL
+						if (channel == null)
+							//TODO handle INVALID_CHANNEL
+							continue;
 						channel.onUnsubscription(client, reasons[i]);
 					}
 					break;
@@ -269,10 +271,15 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 
 		@Override
 		public void onWebSocketClose(int statusCode, String reason) {
-			System.out.println("Close: statusCode=" + statusCode + ", reason=" + reason);
-			for (AbstractWsDataChannel channel : WsDataSource.this.channels.values())
-				if (channel.isSubscriber(this))
-					channel.onUnsubscription(this, UnsubscriptionReason.NETWORK_DISCONNECT);
+			try {
+				System.out.println("Close: statusCode=" + statusCode + ", reason=" + reason);
+				WsDataSource.this.channels.forEachValue(10, channel->{
+					if (channel.isSubscriber(this))
+						channel.onUnsubscription(this, UnsubscriptionReason.NETWORK_DISCONNECT);
+				});
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
 		}
 
 		@Override
