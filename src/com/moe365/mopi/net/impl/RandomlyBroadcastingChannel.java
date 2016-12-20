@@ -16,6 +16,10 @@ public class RandomlyBroadcastingChannel extends AbstractWsDataChannel implement
 		this.id = 500;
 		this.source = source;
 		this.subscribers = ConcurrentHashMap.newKeySet();
+		metadata.put("name", this.name);
+		metadata.put("video.format", "MJPEG");
+		metadata.put("video.width", "100");
+		metadata.put("video.height", "100");
 	}
 	@Override
 	public DataPacket parseNext(ByteBuffer buf, int typeCode) {

@@ -136,13 +136,22 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 					client.write(response);
 					break;
 				}
-				case PacketTypeCode.CHANNEL_METADATA_REQUEST:
-					System.out.println("Channel metadata request from " + client);
-					client.write(new ChannelEnumerationPacket(channels.values().toArray(new DataChannel[channels.size()]))
-						.setId(lastPacketId++)
-						.setChannelId(0)
-						.setAckId(packet.getId()));
+				case PacketTypeCode.CHANNEL_METADATA_REQUEST: {
+					int cID = ((ChannelMetadataRequestPacket)packet).getTargetChannelId();
+					System.out.println("Channel metadata request from " + client + " for channel ID " + cID);
+					AbstractWsDataChannel channel = WsDataSource.this.channels.get(cID);
+					MutableDataPacket response;
+					if (channel == null) {
+						response = new MutableErrorPacket(ErrorCode.INVALID_CHANNEL, "Unknown channel " + cID);
+					} else {
+						response = new ChannelMetadataPacket(channel.getMetadata());
+					}
+					client.write(response
+							.setId(lastPacketId++)
+							.setAckId(packet.getId())
+							.setChannelId(0));
 					break;
+				}
 				case PacketTypeCode.CHANNEL_SUBSCRIBE: {
 					System.out.println("Channel subscription from " + client);
 					ChannelSubscribePacket subscribePacket = (ChannelSubscribePacket) packet;

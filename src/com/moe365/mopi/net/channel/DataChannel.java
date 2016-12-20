@@ -2,6 +2,7 @@ package com.moe365.mopi.net.channel;
 
 import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
@@ -112,6 +113,8 @@ public interface DataChannel {
 	<T extends DataPacket> CompletableFuture<T> sendPacketExpectResponse(DataPacket packet, DataChannelClient target, Duration timeout);
 	
 	DataPacket parseNext(ByteBuffer buf, int typeCode);
+	
+	Map<String, String> getMetadata();
 
 	/**
 	 * Whether this channel is currently open.
