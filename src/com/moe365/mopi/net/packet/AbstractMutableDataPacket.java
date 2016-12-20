@@ -10,12 +10,20 @@ public abstract class AbstractMutableDataPacket implements MutableDataPacket {
 	protected int channelId;
 	protected int typeCode;
 	protected int ackId;
-
+	
 	public AbstractMutableDataPacket() {
 
 	}
+	
+	public AbstractMutableDataPacket(int typeCode) {
+		this.typeCode = typeCode;
+	}
 
 	public AbstractMutableDataPacket(ByteBuffer buf) {
+		this.read(buf);
+	}
+	
+	protected void read(ByteBuffer buf) {
 		this.channelId = buf.getShort() & 0xFF_FF;
 		this.typeCode = buf.getShort() & 0xFF_FF;
 		this.id = buf.getInt();

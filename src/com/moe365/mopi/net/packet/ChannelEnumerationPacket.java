@@ -7,6 +7,7 @@ import com.moe365.mopi.net.channel.DataChannel;
 public class ChannelEnumerationPacket extends AbstractMutableDataPacket {
 	DataChannel[] channels;
 	public ChannelEnumerationPacket(DataChannel...channels) {
+		super(PacketTypeCode.CHANNEL_ENUMERATION);
 		this.channels = channels;
 	}
 	
