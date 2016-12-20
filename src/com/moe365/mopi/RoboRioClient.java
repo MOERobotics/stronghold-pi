@@ -315,7 +315,6 @@ public class RoboRioClient implements Closeable {
 		buffer.limit(buffer.capacity());
 		buffer.putInt(packetNum.getAndIncrement());
 		buffer.putShort(status);
-		buffer.putShort(flag);
 	}
 	
 	protected void send(ByteBuffer buffer) throws IOException {
