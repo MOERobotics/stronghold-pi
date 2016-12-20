@@ -194,8 +194,8 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 		}
 
 		@Override
-		public DataPacket parseNext(ByteBuffer buf) {
-			Function<ByteBuffer, DataPacket> builder = WsDataSource.this.packetBuilders.get(buf.getShort(buf.position() + DataPacket.TYPE_CODE_OFFSET));
+		public DataPacket parseNext(ByteBuffer buf, int typeCode) {
+			Function<ByteBuffer, DataPacket> builder = WsDataSource.this.packetBuilders.get(typeCode);
 			if (builder == null)
 				throw new DataPacketException(ErrorCode.UNKNOWN_PACKET_TYPE);
 			return builder.apply(buf);
@@ -309,8 +309,9 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 			//Build packet
 			DataPacket packet;
 			try {
-				packet = channel.parseNext(buf);
+				packet = channel.parseNext(buf, tmpPacket.getTypeCode());
 			} catch (DataPacketException e0) {
+				e0.printStackTrace();
 				write(new MutableErrorPacket(e0.getCode(), e0.getMessage())
 						.setId(lastPacketId++)
 						.setAckId(tmpPacket.getId())

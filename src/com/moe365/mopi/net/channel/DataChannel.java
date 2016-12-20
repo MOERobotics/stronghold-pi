@@ -111,7 +111,7 @@ public interface DataChannel {
 	 */
 	<T extends DataPacket> CompletableFuture<T> sendPacketExpectResponse(DataPacket packet, DataChannelClient target, Duration timeout);
 	
-	DataPacket parseNext(ByteBuffer buf);
+	DataPacket parseNext(ByteBuffer buf, int typeCode);
 
 	/**
 	 * Whether this channel is currently open.

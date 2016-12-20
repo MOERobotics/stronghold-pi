@@ -18,7 +18,7 @@ public class RandomlyBroadcastingChannel extends AbstractWsDataChannel implement
 		this.subscribers = ConcurrentHashMap.newKeySet();
 	}
 	@Override
-	public DataPacket parseNext(ByteBuffer buf) {
+	public DataPacket parseNext(ByteBuffer buf, int typeCode) {
 		// TODO Auto-generated method stub
 		return null;
 	}
