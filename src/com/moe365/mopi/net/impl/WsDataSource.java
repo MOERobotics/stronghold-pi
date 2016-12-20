@@ -186,11 +186,15 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 					break;
 			}
 		}
+		
+		@Override
+		protected boolean isSubscriber(DataChannelClient client) {
+			return true;
+		}
 
 		@Override
 		protected void onUnsubscription(DataChannelClient client, UnsubscriptionReason reason) {
 			// TODO Auto-generated method stub
-			
 		}
 
 		@Override
