@@ -8,7 +8,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 import java.lang.Thread.UncaughtExceptionHandler;
-import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.util.Collections;
@@ -20,10 +19,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.eclipse.jetty.server.Server;
+
 import com.moe365.mopi.CommandLineParser.ParsedCommandLineArguments;
 import com.moe365.mopi.geom.Polygon;
 import com.moe365.mopi.geom.Polygon.PointNode;
 import com.moe365.mopi.geom.PreciseRectangle;
+import com.moe365.mopi.net.MPHttpServer;
 import com.moe365.mopi.processing.AbstractImageProcessor;
 import com.moe365.mopi.processing.ContourTracer;
 import com.pi4j.io.gpio.GpioController;
@@ -36,12 +38,10 @@ import com.pi4j.io.gpio.RaspiPin;
 import au.edu.jcu.v4l4j.CaptureCallback;
 import au.edu.jcu.v4l4j.Control;
 import au.edu.jcu.v4l4j.ControlList;
-import au.edu.jcu.v4l4j.ImagePalette;
 import au.edu.jcu.v4l4j.JPEGFrameGrabber;
 import au.edu.jcu.v4l4j.V4L4JConstants;
 import au.edu.jcu.v4l4j.VideoDevice;
 import au.edu.jcu.v4l4j.VideoFrame;
-import au.edu.jcu.v4l4j.encoder.JPEGEncoder;
 import au.edu.jcu.v4l4j.exceptions.ControlException;
 import au.edu.jcu.v4l4j.exceptions.StateException;
 import au.edu.jcu.v4l4j.exceptions.UnsupportedMethod;
@@ -128,7 +128,7 @@ public class Main {
 			
 		});
 		
-		final MJPEGServer server = initServer(parsed, executor);
+		final MPHttpServer server = initServer(parsed, executor);
 		
 		final VideoDevice device = camera = initCamera(parsed);
 		
@@ -152,8 +152,6 @@ public class Main {
 				case "client":
 					testClient(client);
 					break;
-				case "sse":
-					testSSE(server);
 				default:
 					System.err.println("Unknown test '" + target + "'");
 			}
@@ -193,12 +191,12 @@ public class Main {
 				public void exceptionReceived(V4L4JException e) {
 					e.printStackTrace();
 					fg.stopCapture();
-					if (server != null)
-						try {
+					try {
+						if (server != null)
 							server.shutdown();
-						} catch (IOException e1) {
-							e1.printStackTrace();
-						}
+					} catch (Exception e1) {
+						e1.printStackTrace();
+					}
 				}
 			});
 			fg.startCapture();
@@ -361,7 +359,7 @@ public class Main {
 	 * @param client
 	 * @return Image proccessor to handle images, or null if disabled
 	 */
-	protected static AbstractImageProcessor<?> initProcessor(ParsedCommandLineArguments args, final MJPEGServer httpServer, final RoboRioClient client) {
+	protected static AbstractImageProcessor<?> initProcessor(ParsedCommandLineArguments args, final MPHttpServer httpServer, final RoboRioClient client) {
 		if (args.isFlagSet("--no-process")) {
 			System.out.println("PROCESSOR DISABLED");
 			return null;
@@ -520,13 +518,17 @@ public class Main {
 	 * @return server, if created, or null
 	 * @throws IOException
 	 */
-	protected static MJPEGServer initServer(ParsedCommandLineArguments args, ExecutorService executor) throws IOException {
+	protected static MPHttpServer initServer(ParsedCommandLineArguments args, ExecutorService executor) throws IOException {
 		int port = args.getOrDefault("--port", DEFAULT_PORT);
 		
 		if (port > 0 && !args.isFlagSet("--no-server")) {
-			MJPEGServer server = new MJPEGServer(new InetSocketAddress(port));
-			server.runOn(executor);
-			server.start();
+			MPHttpServer server = new MPHttpServer(port, args.getOrDefault("--moejs-dir", "../moe.js/build"));
+			try {
+				server.start();
+			} catch (Exception e) {
+				e.printStackTrace();
+				return null;
+			}
 			return server;
 		} else {
 			System.out.println("SERVER DISABLED");
@@ -620,6 +622,7 @@ public class Main {
 			.addFlag("--no-camera", "Do not specify a camera. This option will cause the program to not invoke v4l4j.")
 			.addFlag("--no-udp", "Disable broadcasting UDP.")
 			.addFlag("--no-gpio", "Disable attaching to a pin. Invoking this option will not invoke WiringPi. Note that the pin is reqired for image processing.")
+			.addKvPair("--moejs-dir", "dir", "Directory to find MOE.js static files in.")
 			.build();
 		File outputFile = new File("src/resources/parser.ser");
 		if (outputFile.exists())
