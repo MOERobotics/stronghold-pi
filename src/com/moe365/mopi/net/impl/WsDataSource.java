@@ -33,6 +33,7 @@ import com.moe365.mopi.net.packet.AckPacket;
 import com.moe365.mopi.net.packet.ChannelClosePacket;
 import com.moe365.mopi.net.packet.ChannelEnumerationPacket;
 import com.moe365.mopi.net.packet.ChannelEnumerationRequestPacket;
+import com.moe365.mopi.net.packet.ChannelMetadataPacket;
 import com.moe365.mopi.net.packet.ChannelMetadataRequestPacket;
 import com.moe365.mopi.net.packet.ChannelSubscribePacket;
 import com.moe365.mopi.net.packet.ChannelUnsubscribePacket;
@@ -40,6 +41,7 @@ import com.moe365.mopi.net.packet.ClientHelloPacket;
 import com.moe365.mopi.net.packet.DataPacket;
 import com.moe365.mopi.net.packet.ErrorPacket;
 import com.moe365.mopi.net.packet.ErrorPacket.MutableErrorPacket;
+import com.moe365.mopi.net.packet.MutableDataPacket;
 import com.moe365.mopi.net.packet.MutableWrappingDataPacket;
 import com.moe365.mopi.net.packet.PacketTypeCode;
 import com.moe365.mopi.net.packet.PropertyEnumerationPacket;
@@ -255,7 +257,7 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 		public CompletableFuture<Void> write(ByteBuffer data) {
 			CompletableFuture<Void> result = new CompletableFuture<>();
 			if (data.hasArray()) {
-				System.out.println("Writing: " + StringUtils.toHexString(data.array(), data.position(), data.limit(), 16));
+//				System.out.println("Writing: " + StringUtils.toHexString(data.array(), data.position(), data.limit(), 16));
 			}
 			try {
 				session.getRemote().sendBytes(data, new WriteCallback() {
@@ -342,7 +344,6 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 				e.printStackTrace();
 				return;
 			}
-			System.out.println("Packet: " + packet);
 			
 			//Respond to ACK listener(s)
 			if (packet.getAckId() != 0)
