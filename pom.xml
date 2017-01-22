@@ -92,11 +92,15 @@
   		<groupId>au.edu.jcu.v4l4j</groupId>
   		<artifactId>v4l4j</artifactId>
   		<version>0.9.1</version>
+  		<scope>system</scope>
+  		<systemPath>${basedir}/lib/v4l4j.jar</systemPath>
   	</dependency>
   	<dependency>
   		<groupId>com.mindlin.mdns</groupId>
   		<artifactId>mdns4j</artifactId>
   		<version>1.0</version>
+  		<scope>system</scope>
+  		<systemPath>${basedir}/lib/mdns4j.jar</systemPath>
   	</dependency>
   </dependencies>
 </project>
