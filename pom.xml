@@ -88,5 +88,15 @@
   		<artifactId>pi4j-core</artifactId>
   		<version>1.1</version>
   	</dependency>
+  	<dependency>
+  		<groupId>au.edu.jcu.v4l4j</groupId>
+  		<artifactId>v4l4j</artifactId>
+  		<version>0.9.1</version>
+  	</dependency>
+  	<dependency>
+  		<groupId>com.mindlin.mdns</groupId>
+  		<artifactId>mdns4j</artifactId>
+  		<version>1.0</version>
+  	</dependency>
   </dependencies>
 </project>
