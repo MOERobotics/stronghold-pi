@@ -70,7 +70,7 @@ public class EventfulWsDataChannel extends AbstractWsDataChannel implements Even
 	}
 	
 	@Override
-	public DataPacket parseNext(ByteBuffer buf) {
+	public DataPacket parseNext(ByteBuffer buf, int typeCode) {
 		return null;
 	}
 

@@ -33,6 +33,7 @@ import com.moe365.mopi.net.packet.AckPacket;
 import com.moe365.mopi.net.packet.ChannelClosePacket;
 import com.moe365.mopi.net.packet.ChannelEnumerationPacket;
 import com.moe365.mopi.net.packet.ChannelEnumerationRequestPacket;
+import com.moe365.mopi.net.packet.ChannelMetadataPacket;
 import com.moe365.mopi.net.packet.ChannelMetadataRequestPacket;
 import com.moe365.mopi.net.packet.ChannelSubscribePacket;
 import com.moe365.mopi.net.packet.ChannelUnsubscribePacket;
@@ -40,6 +41,7 @@ import com.moe365.mopi.net.packet.ClientHelloPacket;
 import com.moe365.mopi.net.packet.DataPacket;
 import com.moe365.mopi.net.packet.ErrorPacket;
 import com.moe365.mopi.net.packet.ErrorPacket.MutableErrorPacket;
+import com.moe365.mopi.net.packet.MutableDataPacket;
 import com.moe365.mopi.net.packet.MutableWrappingDataPacket;
 import com.moe365.mopi.net.packet.PacketTypeCode;
 import com.moe365.mopi.net.packet.PropertyEnumerationPacket;
@@ -136,13 +138,22 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 					client.write(response);
 					break;
 				}
-				case PacketTypeCode.CHANNEL_METADATA_REQUEST:
-					System.out.println("Channel metadata request from " + client);
-					client.write(new ChannelEnumerationPacket(channels.values().toArray(new DataChannel[channels.size()]))
-						.setId(lastPacketId++)
-						.setChannelId(0)
-						.setAckId(packet.getId()));
+				case PacketTypeCode.CHANNEL_METADATA_REQUEST: {
+					int cID = ((ChannelMetadataRequestPacket)packet).getTargetChannelId();
+					System.out.println("Channel metadata request from " + client + " for channel ID " + cID);
+					AbstractWsDataChannel channel = WsDataSource.this.channels.get(cID);
+					MutableDataPacket response;
+					if (channel == null) {
+						response = new MutableErrorPacket(ErrorCode.INVALID_CHANNEL, "Unknown channel " + cID);
+					} else {
+						response = new ChannelMetadataPacket(channel.getMetadata());
+					}
+					client.write(response
+							.setId(lastPacketId++)
+							.setAckId(packet.getId())
+							.setChannelId(0));
 					break;
+				}
 				case PacketTypeCode.CHANNEL_SUBSCRIBE: {
 					System.out.println("Channel subscription from " + client);
 					ChannelSubscribePacket subscribePacket = (ChannelSubscribePacket) packet;
@@ -171,7 +182,9 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 					UnsubscriptionReason[] reasons = unsubscribePacket.getReasons();
 					for (int i = 0; i < ids.length; i++) {
 						AbstractWsDataChannel channel = channels.get(ids[i]);
-						//TODO handle INVALID_CHANNEL
+						if (channel == null)
+							//TODO handle INVALID_CHANNEL
+							continue;
 						channel.onUnsubscription(client, reasons[i]);
 					}
 					break;
@@ -186,16 +199,20 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 					break;
 			}
 		}
+		
+		@Override
+		protected boolean isSubscriber(DataChannelClient client) {
+			return true;
+		}
 
 		@Override
 		protected void onUnsubscription(DataChannelClient client, UnsubscriptionReason reason) {
 			// TODO Auto-generated method stub
-			
 		}
 
 		@Override
-		public DataPacket parseNext(ByteBuffer buf) {
-			Function<ByteBuffer, DataPacket> builder = WsDataSource.this.packetBuilders.get(buf.getShort(buf.position() + DataPacket.TYPE_CODE_OFFSET));
+		public DataPacket parseNext(ByteBuffer buf, int typeCode) {
+			Function<ByteBuffer, DataPacket> builder = WsDataSource.this.packetBuilders.get(typeCode);
 			if (builder == null)
 				throw new DataPacketException(ErrorCode.UNKNOWN_PACKET_TYPE);
 			return builder.apply(buf);
@@ -240,7 +257,7 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 		public CompletableFuture<Void> write(ByteBuffer data) {
 			CompletableFuture<Void> result = new CompletableFuture<>();
 			if (data.hasArray()) {
-				System.out.println("Writing: " + StringUtils.toHexString(data.array(), data.position(), data.limit(), 16));
+//				System.out.println("Writing: " + StringUtils.toHexString(data.array(), data.position(), data.limit(), 16));
 			}
 			try {
 				session.getRemote().sendBytes(data, new WriteCallback() {
@@ -265,10 +282,15 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 
 		@Override
 		public void onWebSocketClose(int statusCode, String reason) {
-			System.out.println("Close: statusCode=" + statusCode + ", reason=" + reason);
-			for (AbstractWsDataChannel channel : WsDataSource.this.channels.values())
-				if (channel.isSubscriber(this))
-					channel.onUnsubscription(this, UnsubscriptionReason.NETWORK_DISCONNECT);
+			try {
+				System.out.println("Close: statusCode=" + statusCode + ", reason=" + reason);
+				WsDataSource.this.channels.forEachValue(10, channel->{
+					if (channel.isSubscriber(this))
+						channel.onUnsubscription(this, UnsubscriptionReason.NETWORK_DISCONNECT);
+				});
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
 		}
 
 		@Override
@@ -309,8 +331,9 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 			//Build packet
 			DataPacket packet;
 			try {
-				packet = channel.parseNext(buf);
+				packet = channel.parseNext(buf, tmpPacket.getTypeCode());
 			} catch (DataPacketException e0) {
+				e0.printStackTrace();
 				write(new MutableErrorPacket(e0.getCode(), e0.getMessage())
 						.setId(lastPacketId++)
 						.setAckId(tmpPacket.getId())
@@ -321,7 +344,6 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 				e.printStackTrace();
 				return;
 			}
-			System.out.println("Packet: " + packet);
 			
 			//Respond to ACK listener(s)
 			if (packet.getAckId() != 0)

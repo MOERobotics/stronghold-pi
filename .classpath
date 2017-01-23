@@ -1,48 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
-	<classpathentry kind="src" path="src"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/v4l4j"/>
-	<classpathentry kind="lib" path="lib/pi4j-1.0/lib/pi4j-core.jar" sourcepath="lib/pi4j-1.0/lib/pi4j-core-sources.jar"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/mdns4j"/>
-	<classpathentry kind="lib" path="lib/jetty/cdi-websocket-9.3.11.v20160721.jar"/>
-	<classpathentry kind="lib" path="lib/jetty/websocket/websocket-api-9.3.11.v20160721.jar"/>
-	<classpathentry kind="lib" path="lib/jetty/websocket/javax.websocket-api-1.0.jar">
+	<classpathentry including="**/*.java" kind="src" output="bin" path="src">
 		<attributes>
-			<attribute name="javadoc_location" value="http://download.eclipse.org/jetty/stable-9/apidocs/"/>
+			<attribute name="optional" value="true"/>
+			<attribute name="maven.pomderived" value="true"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry kind="lib" path="lib/jetty/websocket/javax-websocket-server-impl-9.3.11.v20160721.jar">
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.8">
 		<attributes>
-			<attribute name="javadoc_location" value="http://download.eclipse.org/jetty/stable-9/apidocs/"/>
+			<attribute name="maven.pomderived" value="true"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry kind="lib" path="lib/jetty/websocket/websocket-common-9.3.11.v20160721.jar"/>
-	<classpathentry kind="lib" path="lib/jetty/websocket/websocket-server-9.3.11.v20160721.jar"/>
-	<classpathentry kind="lib" path="lib/jetty/jetty-webapp-9.3.11.v20160721.jar"/>
-	<classpathentry kind="lib" path="lib/jetty/annotations/javax.annotation-api-1.2.jar"/>
-	<classpathentry kind="lib" path="lib/jetty/jetty-server-9.3.11.v20160721.jar">
+	<classpathentry kind="con" path="org.eclipse.m2e.MAVEN2_CLASSPATH_CONTAINER">
 		<attributes>
-			<attribute name="javadoc_location" value="http://download.eclipse.org/jetty/stable-9/apidocs/"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry kind="lib" path="lib/jetty/jetty-util-9.3.11.v20160721.jar"/>
-	<classpathentry kind="lib" path="lib/jetty/jetty-http-9.3.11.v20160721.jar">
-		<attributes>
-			<attribute name="javadoc_location" value="http://download.eclipse.org/jetty/stable-9/apidocs/"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry kind="lib" path="lib/jetty/servlet-api-3.1.jar"/>
-	<classpathentry kind="lib" path="lib/jetty/websocket/websocket-servlet-9.3.11.v20160721.jar"/>
-	<classpathentry kind="lib" path="lib/jetty/jetty-servlet-9.3.11.v20160721.jar">
-		<attributes>
-			<attribute name="javadoc_location" value="http://download.eclipse.org/jetty/stable-9/apidocs/"/>
-		</attributes>
-	</classpathentry>
-	<classpathentry kind="lib" path="lib/jetty/jetty-io-9.3.11.v20160721.jar"/>
-	<classpathentry kind="lib" path="lib/jetty/jetty-security-9.3.11.v20160721.jar">
-		<attributes>
-			<attribute name="javadoc_location" value="http://download.eclipse.org/jetty/stable-9/apidocs/"/>
+			<attribute name="maven.pomderived" value="true"/>
 		</attributes>
 	</classpathentry>
 	<classpathentry kind="output" path="bin"/>

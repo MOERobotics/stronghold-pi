@@ -21,7 +21,7 @@ public class ServerController {
 	protected void addWsHandler() {
 		WsDataSource source = new WsDataSource();
 		final ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS|ServletContextHandler.NO_SECURITY);
-		RandomlyBroadcastingChannel ch = new RandomlyBroadcastingChannel(source);
+		RandomlyBroadcastingChannel ch = new RandomlyBroadcastingChannel(source, 100, "Test channel");
 		source.registerChannel(ch);
 		context.setContextPath("/");
 		server.setHandler(context);

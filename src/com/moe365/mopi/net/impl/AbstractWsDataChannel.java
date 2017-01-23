@@ -4,7 +4,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
@@ -12,8 +13,6 @@ import java.util.function.BiConsumer;
 
 import com.moe365.mopi.net.channel.DataChannel;
 import com.moe365.mopi.net.channel.DataChannelClient;
-import com.moe365.mopi.net.channel.DataChannelDirection;
-import com.moe365.mopi.net.channel.DataChannelMediaType;
 import com.moe365.mopi.net.channel.UnsubscriptionReason;
 import com.moe365.mopi.net.impl.ResponseHandlerManager.ResponseHandler;
 import com.moe365.mopi.net.impl.WsDataSource.WsClient;
@@ -27,10 +26,26 @@ import com.moe365.mopi.net.packet.MutableWrappingDataPacket;
  * @author mailmindlin
  */
 public abstract class AbstractWsDataChannel implements DataChannel {
+	protected final Map<String, String> metadata;
 	protected WsDataSource source;
 	protected int id;
 	protected String name;
 	protected Set<WsClient> subscribers;
+	
+	public AbstractWsDataChannel() {
+		this(new HashMap<>());
+	}
+	
+	public AbstractWsDataChannel(WsDataSource source, int id, String name) {
+		this();
+		this.id = id;
+		this.name = name;
+		this.metadata.put("name", name);
+	}
+	
+	public AbstractWsDataChannel(Map<String, String> metadata) {
+		this.metadata = metadata;
+	}
 
 	@Override
 	public int getId() {
@@ -146,4 +161,8 @@ public abstract class AbstractWsDataChannel implements DataChannel {
 		
 	}
 
+	@Override
+	public Map<String, String> getMetadata() {
+		return this.metadata;
+	}
 }
