@@ -11,8 +11,8 @@ import java.lang.Thread.UncaughtExceptionHandler;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -168,9 +168,7 @@ public class Main {
 			fg.setFrameInterval(parsed.getOrDefault("--fps-num", 1), parsed.getOrDefault("--fps-denom", 10));
 			System.out.println("Framerate: " + fg.getFrameInterval());
 			
-			fg.setCaptureCallback(new CaptureCallback() {
-				@Override
-				public void nextFrame(VideoFrame frame) {
+			fg.setCaptureCallback(frame -> {
 					try {
 						if (server != null && ledState.get())
 							server.offerFrame(frame);
@@ -187,10 +185,8 @@ public class Main {
 						e.printStackTrace();
 						throw e;
 					}
-				}
-	
-				@Override
-				public void exceptionReceived(V4L4JException e) {
+				}, 
+				e -> {
 					e.printStackTrace();
 					fg.stopCapture();
 					if (server != null)
@@ -199,7 +195,6 @@ public class Main {
 						} catch (IOException e1) {
 							e1.printStackTrace();
 						}
-				}
 			});
 			fg.startCapture();
 		}
@@ -223,8 +218,8 @@ public class Main {
 	
 	protected static void testSSE(MJPEGServer server) throws InterruptedException {
 		System.out.println("RUNNING TEST: SSE");
-		while (true) {
-			List<PreciseRectangle> rects = new LinkedList<>();
+		while (!Thread.interrupted()) {
+			List<PreciseRectangle> rects = new ArrayList<>(2);
 			server.offerRectangles(rects);
 			Thread.sleep(1000);
 			rects.add(new PreciseRectangle(0.0,0.0,0.2,0.2));
