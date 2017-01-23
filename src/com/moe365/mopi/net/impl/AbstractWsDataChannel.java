@@ -36,10 +36,11 @@ public abstract class AbstractWsDataChannel implements DataChannel {
 		this(new HashMap<>());
 	}
 	
-	public AbstractWsDataChannel(String name) {
+	public AbstractWsDataChannel(WsDataSource source, int id, String name) {
 		this();
-		this.metadata.put("name", name);
+		this.id = id;
 		this.name = name;
+		this.metadata.put("name", name);
 	}
 	
 	public AbstractWsDataChannel(Map<String, String> metadata) {

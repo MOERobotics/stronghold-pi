@@ -19,8 +19,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.eclipse.jetty.server.Server;
-
 import com.moe365.mopi.CommandLineParser.ParsedCommandLineArguments;
 import com.moe365.mopi.geom.Polygon;
 import com.moe365.mopi.geom.Polygon.PointNode;
@@ -93,7 +91,7 @@ public class Main {
 	 * @throws InterruptedException
 	 */
 	public static void main(String...fred) throws IOException, V4L4JException, InterruptedException {
-		CommandLineParser parser = loadParser();
+		CommandLineParser parser = buildParser();
 		ParsedCommandLineArguments parsed = parser.apply(fred);
 		
 		if (parsed.isFlagSet("--help")) {
@@ -104,13 +102,21 @@ public class Main {
 		if (parsed.isFlagSet("--rebuild-parser")) {
 			System.out.print("Building parser...\t");
 			buildParser();
+			File outputFile = new File("src/resources/parser.ser");
+			if (outputFile.exists())
+				outputFile.delete();
+			try (ObjectOutput out = new ObjectOutputStream(new FileOutputStream(outputFile))) {
+				out.writeObject(parser);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 			System.out.println("Done.");
 			System.exit(0);
 		}
 		
 		width = parsed.getOrDefault("--width", 640);
 		height = parsed.getOrDefault("--height", 480);
-		System.out.println("Frame size: " + width + "x" + height);
+		//System.out.println("Frame size: " + width + "x" + height);
 		
 		final ExecutorService executor = Executors.newCachedThreadPool(new ThreadFactory() {
 			final UncaughtExceptionHandler handler = (t, e) -> {
@@ -127,6 +133,7 @@ public class Main {
 			}
 			
 		});
+		
 		
 		final MPHttpServer server = initServer(parsed, executor);
 		
@@ -520,6 +527,7 @@ public class Main {
 	 */
 	protected static MPHttpServer initServer(ParsedCommandLineArguments args, ExecutorService executor) throws IOException {
 		int port = args.getOrDefault("--port", DEFAULT_PORT);
+		System.out.println("Port: " + port);
 		
 		if (port > 0 && !args.isFlagSet("--no-server")) {
 			MPHttpServer server = new MPHttpServer(port, args.getOrDefault("--moejs-dir", "../moe.js/build"));
@@ -624,14 +632,6 @@ public class Main {
 			.addFlag("--no-gpio", "Disable attaching to a pin. Invoking this option will not invoke WiringPi. Note that the pin is reqired for image processing.")
 			.addKvPair("--moejs-dir", "dir", "Directory to find MOE.js static files in.")
 			.build();
-		File outputFile = new File("src/resources/parser.ser");
-		if (outputFile.exists())
-			outputFile.delete();
-		try (ObjectOutput out = new ObjectOutputStream(new FileOutputStream(outputFile))) {
-			out.writeObject(parser);
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
 		return parser;
 	}
 }
