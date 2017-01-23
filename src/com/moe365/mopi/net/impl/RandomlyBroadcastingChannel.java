@@ -1,31 +1,38 @@
 package com.moe365.mopi.net.impl;
 
+import java.awt.Color;
+import java.awt.Graphics;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.HashSet;
 import java.util.concurrent.ConcurrentHashMap;
+
+import javax.imageio.ImageIO;
 
 import com.moe365.mopi.net.channel.DataChannelClient;
 import com.moe365.mopi.net.channel.DataChannelDirection;
 import com.moe365.mopi.net.channel.DataChannelMediaType;
 import com.moe365.mopi.net.impl.WsDataSource.WsClient;
-import com.moe365.mopi.net.packet.AckPacket;
 import com.moe365.mopi.net.packet.DataPacket;
+import com.moe365.mopi.net.packet.StreamFramePacket;
 
 public class RandomlyBroadcastingChannel extends AbstractWsDataChannel implements Runnable {
-	public RandomlyBroadcastingChannel(WsDataSource source) {
-		this.id = 500;
-		this.source = source;
+	
+	public RandomlyBroadcastingChannel(WsDataSource source, int id, String name) {
+		super(source, id, name);
 		this.subscribers = ConcurrentHashMap.newKeySet();
-		metadata.put("name", this.name);
 		metadata.put("video.format", "MJPEG");
 		metadata.put("video.width", "100");
 		metadata.put("video.height", "100");
 	}
+	
 	@Override
 	public DataPacket parseNext(ByteBuffer buf, int typeCode) {
 		// TODO Auto-generated method stub
 		return null;
 	}
+	
 
 	@Override
 	protected boolean onSubscription(DataChannelClient client) {
@@ -36,29 +43,52 @@ public class RandomlyBroadcastingChannel extends AbstractWsDataChannel implement
 	@Override
 	protected void onRecievePacket(DataPacket packet, DataChannelClient client) {
 		// TODO Auto-generated method stub
-		
+		System.out.println("Recieved packet " + packet);
 	}
 
 	@Override
 	public void run() {
-		DataPacket packet = new AckPacket(1234);
+		final int width = 100;
+		final int height = 100;
+		BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_3BYTE_BGR);
+		
+		//Thanks to http://stackoverflow.com/a/10929569/2759984 for about the graphics
+		Graphics g = img.getGraphics();
+		
+		int i = 0;
 		while(!Thread.interrupted()) {
-			this.broadcastPacket(packet);
+			g.setColor(Color.RED);
+			g.fillRect(0, 0, width, height);
+			g.setColor(Color.BLUE);
+			g.setFont(g.getFont().deriveFont(24f));
+			g.drawString("" + (i++), 45, 50 + 24/2);
+			
+			final byte[] imgData;
+			try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+				ImageIO.write(img, "JPEG", baos);
+				imgData = baos.toByteArray();
+			} catch (IOException e) {
+				e.printStackTrace();
+				return;
+			}
+			this.broadcastPacket(StreamFramePacket.wrapImage(ByteBuffer.wrap(imgData)));
 			try {
-				Thread.sleep(50);
+				Thread.sleep(5000);
 			} catch (InterruptedException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
 	}
+	
 	@Override
 	public DataChannelMediaType getType() {
-		return DataChannelMediaType.OBJECT_STREAM;
+		return DataChannelMediaType.VIDEO;
 	}
+	
 	@Override
 	public DataChannelDirection getDirection() {
-		return DataChannelDirection.CLIENT_TO_SERVER;
+		return DataChannelDirection.SERVER_TO_CLIENT;
 	}
 
 }
