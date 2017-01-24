@@ -2,8 +2,8 @@ package com.moe365.mopi.net.impl;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -117,10 +117,10 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 	}
 	
 	class MetaChannel extends AbstractWsDataChannel {
-
 		@Override
 		protected boolean onSubscription(DataChannelClient client) {
-			return false;//All clients are implicitly subscribed
+			//All clients are implicitly subscribed
+			return false;
 		}
 
 		@Override
@@ -202,6 +202,7 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 		
 		@Override
 		protected boolean isSubscriber(DataChannelClient client) {
+			//Every client is implicitly a subscriber of channel 0
 			return true;
 		}
 
@@ -227,16 +228,15 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 		public DataChannelDirection getDirection() {
 			return DataChannelDirection.BOTH;
 		}
-		
 	}
 
 	public class WsClient implements WebSocketListener, DataChannelClient {
 		Session session;
-		protected HashMap<String, Object> properties;
+		protected Map<String, Object> properties;
 		
 		public void sessionPut(String key, Object value) {
 			if (properties == null)
-				this.properties = (HashMap<String, Object>)(Object)new ConcurrentHashMap<String, Object>();
+				this.properties = new ConcurrentHashMap<>();
 			properties.put(key, value);
 		}
 		

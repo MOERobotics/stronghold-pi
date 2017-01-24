@@ -200,8 +200,7 @@ public class Main {
 					} catch (Exception e1) {
 						e1.printStackTrace();
 					}
-				}
-			});
+				});
 			fg.startCapture();
 		}
 	}
