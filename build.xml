@@ -13,6 +13,7 @@
 		<pathelement location="${project.src}"/>
 		<fileset dir="${project.lib}">
 			<include name="*.jar"/>
+			<include name="**/*.jar"/>
 		</fileset>
 	</path>
 	
