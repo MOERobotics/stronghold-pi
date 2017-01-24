@@ -1,0 +1,115 @@
+<project name="MoePi" default="usage" xmlns:if="ant:if" xmlns:unless="ant:unless">
+	<property file="build.properties"/>
+	
+	<!-- 
+		destdir property is used when installing v4l4j.jar, JNIlib and javadoc
+		It is a prefix that will be added before install paths
+	-->
+	<condition property="destdir" value="${DESTDIR}" else="">
+		<isset property="DESTDIR"/>
+	</condition>
+
+	<path id="build.classpath">
+		<pathelement location="${project.src}"/>
+		<fileset dir="${project.lib}">
+			<include name="*.jar"/>
+		</fileset>
+	</path>
+	
+	<path id="test.classpath">
+		<pathelement location="${project.classes}" />
+		<fileset dir="${project.lib}">
+			<include name="*.jar"/>
+		</fileset>
+	</path>
+	
+	<target name="usage">
+		<echo message=""/>
+		<echo message="MoePi | MOE 365"/>
+		<echo message=""/>
+		<echo message="Available targets:"/>
+		<echo message="	compile"/>
+		<echo message="	compile-debug"/>
+		<echo message="	jar"/>
+		<echo message="	jar-debug"/>
+		<echo message="	jar-src"/>
+		<echo message="	jar-full"/>
+		<echo message="	libs"/>
+		<echo message="	usage"/>
+		<echo message="	clean"/>
+	</target>
+	
+	<target name="init">
+		<mkdir dir="${project.classes}"/>
+	</target>
+	
+	<target name="compile" depends="init">
+		<javac srcdir="${project.src}" destdir="${project.classes}" deprecation="on" source="${source}" debug="off">
+			<classpath refid="build.classpath"/>
+			<include name="**/*.java" />
+			<exclude name="**/test/*.java" />
+			<exclude name="**/package-info.java" />
+		</javac>
+		<javac srcdir="${project.src}" destdir="${project.classes}" deprecation="on" source="${source}" debug="on">
+			<classpath refid="build.classpath"/>
+			<include name="**/test/*.java" />
+			<exclude name="**/package-info.java" />
+		</javac>
+	</target>
+	
+	<target name="compile-debug" depends="init">
+		<javac srcdir="${project.src}" destdir="${project.classes}" deprecation="on" source="${source}" debug="on">
+			<classpath refid="build.classpath"/>
+			<include name="**/*.java"/>
+			<exclude name="**/package-info.java" />
+		</javac>
+	</target>
+	
+	<target name="jar" depends="compile">
+		<jar jarfile="${project.dir}/${project.jar.file}">
+			<manifest>
+				<attribute name="Main-Class" value="com.moe365.mopi.Main"/>
+			</manifest>
+			<fileset dir="${project.classes}">
+				<include name="**"/>
+				<exclude name="com/moe365/mopi/test/"/>
+			</fileset>
+		</jar>
+	</target>
+	
+		<target name="jar-debug" depends="compile-debug">
+		<jar jarfile="${project.dir}/${project.jar.file}">
+			<manifest>
+				<attribute name="Main-Class" value="com.moe365.mopi.Main"/>
+			</manifest>
+			<fileset dir="${project.classes}">
+				<include name="**"/>
+				<exclude name="com/moe365/mopi/test/"/>
+			</fileset>
+		</jar>
+	</target>
+
+	<target name="jar-src" depends="compile">
+		<jar jarfile="${project.dir}/${project.jar.file}">
+			<manifest>
+				<attribute name="Main-Class" value="com.moe365.mopi.Main"/>
+			</manifest>
+			<fileset dir="${project.classes}">
+				<include name="**"/>
+				<exclude name="com/moe365/mopi/test/"/>
+			</fileset>
+			<fileset dir="${project.src}">
+				<include name="**"/>
+				<exclude name="com/moe365/mopi/test/"/>
+				<exclude name="**/package-info.java"/>
+			</fileset>
+		</jar>
+	</target>
+	
+	<target name="javadoc">
+		<javadoc sourcepath="${project.src}" packagenames="com.moe365.mopi.*" destdir="${project.javadoc.dir}" public="true" use="true" nodeprecated="true">
+			<excludepackage name="com.moe365.mopi.test"/>
+		</javadoc>
+	</target>
+	
+</project>
