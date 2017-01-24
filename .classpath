@@ -1,7 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
-	<classpathentry kind="src" path="src/main"/>
+	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry kind="con" path="org.eclipse.pde.core.requiredPlugins"/>
+	<classpathentry kind="lib" path="lib/jetty/jetty-http-9.4.1.v20170120.jar"/>
+	<classpathentry kind="lib" path="lib/jetty/jetty-io-9.4.1.v20170120.jar"/>
+	<classpathentry kind="lib" path="lib/jetty/jetty-security-9.4.1.v20170120.jar"/>
+	<classpathentry kind="lib" path="lib/jetty/jetty-server-9.4.1.v20170120.jar"/>
+	<classpathentry kind="lib" path="lib/jetty/jetty-servlet-9.4.1.v20170120.jar"/>
+	<classpathentry kind="lib" path="lib/jetty/jetty-util-9.4.1.v20170120.jar"/>
+	<classpathentry kind="lib" path="lib/jetty/servlet-api-3.1.jar"/>
+	<classpathentry kind="lib" path="lib/jetty/websocket-common-9.4.1.v20170120.jar"/>
+	<classpathentry kind="lib" path="lib/jetty/websocket-server-9.4.1.v20170120.jar"/>
+	<classpathentry kind="lib" path="lib/jetty/websocket-servlet-9.4.1.v20170120.jar"/>
+	<classpathentry kind="lib" path="lib/pi4j-1.1/lib/pi4j-core.jar"/>
+	<classpathentry kind="lib" path="lib/mdns4j.jar"/>
+	<classpathentry kind="lib" path="lib/v4l4j.jar"/>
+	<classpathentry kind="lib" path="lib/jetty/websocket-api-9.4.1.v20170120.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
