@@ -24,9 +24,7 @@ public class MjpegBroadcastChannel extends AbstractWsDataChannel implements Runn
 	protected final ByteBuffer imageBuffer = ByteBuffer.allocate(100 * 1024);
 	
 	public MjpegBroadcastChannel(WsDataSource source, int id, String name) {
-		this.id = id;
-		this.source = source;
-		this.name = name;
+		super(source, id, name);
 		this.subscribers = ConcurrentHashMap.newKeySet();
 		metadata.put("name", this.name);
 		metadata.put("video.format", "MJPEG");
@@ -52,26 +50,32 @@ public class MjpegBroadcastChannel extends AbstractWsDataChannel implements Runn
 
 	@Override
 	public void run() {
-		DataPacket imagePacket = new StreamFramePacket(imageBuffer);
+		System.out.println("Starting broadcast channel @ port " + this.getId());
+		DataPacket imagePacket = StreamFramePacket.wrapImage(imageBuffer);
 		while (!Thread.interrupted()) {
-			try {
-				imageBuffer.wait();
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-				continue;
-			}
 			if (imageStatus.compareAndSet(STATUS_FILLED, STATUS_READING)) {
-				this.broadcastPacket(imagePacket);
+				synchronized (imageBuffer) {
+					this.broadcastPacket(imagePacket);
+				}
 				imageStatus.set(STATUS_EMPTY);
 			}
+			try {
+				Thread.sleep(10);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+				break;
+			}
 		}
+		System.err.println("Bye!");
 	}
 	
 	public void offerFrame(VideoFrame frame) {
 		if (imageStatus.compareAndSet(STATUS_EMPTY, STATUS_WRITING)) {
-			imageBuffer.clear();
-			imageBuffer.put(frame.getBuffer());
-			imageBuffer.flip();
+			synchronized (imageBuffer) {
+				imageBuffer.clear();
+				imageBuffer.put(frame.getBuffer());
+				imageBuffer.flip();
+			}
 			imageStatus.set(STATUS_FILLED);
 		}
 	}
