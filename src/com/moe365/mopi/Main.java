@@ -33,13 +33,13 @@ import com.pi4j.io.gpio.PinMode;
 import com.pi4j.io.gpio.PinState;
 import com.pi4j.io.gpio.RaspiPin;
 
-import au.edu.jcu.v4l4j.CaptureCallback;
 import au.edu.jcu.v4l4j.Control;
 import au.edu.jcu.v4l4j.ControlList;
+import au.edu.jcu.v4l4j.DeviceInfo;
+import au.edu.jcu.v4l4j.ImagePalette;
 import au.edu.jcu.v4l4j.JPEGFrameGrabber;
 import au.edu.jcu.v4l4j.V4L4JConstants;
 import au.edu.jcu.v4l4j.VideoDevice;
-import au.edu.jcu.v4l4j.VideoFrame;
 import au.edu.jcu.v4l4j.exceptions.ControlException;
 import au.edu.jcu.v4l4j.exceptions.StateException;
 import au.edu.jcu.v4l4j.exceptions.UnsupportedMethod;
@@ -183,8 +183,9 @@ public class Main {
 							frame.recycle();
 						}
 //						System.out.println("Frame, " + ledState.get() + ", " + fg.getNumberOfRecycledVideoFrames());
-						ledState.set(!ledState.get());
-						gpioPin.setState(ledState.get() || (!processorEnabled));
+						boolean state = !ledState.get();
+						ledState.set(state);
+						gpioPin.setState(state || (!processorEnabled));
 					} catch (Exception e) {
 						//Make sure to print any/all exceptions
 						e.printStackTrace();
