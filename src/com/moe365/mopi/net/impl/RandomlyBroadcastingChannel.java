@@ -42,7 +42,7 @@ public class RandomlyBroadcastingChannel extends AbstractWsDataChannel implement
 
 	@Override
 	protected void onRecievePacket(DataPacket packet, DataChannelClient client) {
-		// TODO Auto-generated method stub
+		System.out.println("Starting random channel @ port " + this.getId());
 		System.out.println("Recieved packet " + packet);
 	}
 
@@ -75,7 +75,6 @@ public class RandomlyBroadcastingChannel extends AbstractWsDataChannel implement
 			try {
 				Thread.sleep(5000);
 			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}

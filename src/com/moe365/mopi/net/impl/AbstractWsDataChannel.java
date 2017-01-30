@@ -38,6 +38,7 @@ public abstract class AbstractWsDataChannel implements DataChannel {
 	
 	public AbstractWsDataChannel(WsDataSource source, int id, String name) {
 		this();
+		this.source = source;
 		this.id = id;
 		this.name = name;
 		this.metadata.put("name", name);
@@ -79,6 +80,7 @@ public abstract class AbstractWsDataChannel implements DataChannel {
 			mutablePacket = (MutableDataPacket) packet;
 		else
 			mutablePacket = new MutableWrappingDataPacket(packet);
+		
 		mutablePacket.setId(source.lastPacketId++);
 		mutablePacket.setChannelId(this.getId());
 		return mutablePacket;
@@ -86,11 +88,22 @@ public abstract class AbstractWsDataChannel implements DataChannel {
 
 	@Override
 	public CompletableFuture<Void> broadcastPacket(DataPacket packet) {
+		if (this.subscribers.isEmpty())
+			return CompletableFuture.completedFuture(null);
+		
 		ArrayList<CompletableFuture<Void>> result = new ArrayList<>(subscribers.size());
-		DataPacket prepared = preparePacket(packet);
+		
+		DataPacket prepared;
+		try {
+			prepared = preparePacket(packet);
+		} catch (Exception e) {
+			e.printStackTrace();
+			throw e;
+		}
+		
 		// TODO fix for clients added/removed while iterating
 		for (WsClient client : subscribers)
-			result.add(client.write(packet));
+			result.add(client.write(prepared));
 		return CompletableFuture.allOf(result.toArray(new CompletableFuture[result.size()]));
 	}
 
