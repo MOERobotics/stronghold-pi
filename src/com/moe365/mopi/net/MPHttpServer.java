@@ -37,8 +37,8 @@ public class MPHttpServer {
 		this.source = new WsDataSource();
 		context.addServlet(new ServletHolder(this.source), "/vdc.ws");
 		
-		DataChannel random = new RandomlyBroadcastingChannel(this.source, 100, "random");
-		this.source.registerChannel(random);
+//		DataChannel random = new RandomlyBroadcastingChannel(this.source, 1000, "random");
+//		this.source.registerChannel(random);
 		this.videoChannel = new MjpegBroadcastChannel(this.source, 365, "Main MJPEG video stream");
 		this.source.registerChannel(this.videoChannel);
 	}
