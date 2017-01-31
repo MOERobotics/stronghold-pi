@@ -55,7 +55,7 @@ public class ImageProcessor extends AbstractImageProcessor<List<PreciseRectangle
 				int dR = pxOn[0] - pxOff[0];
 				int dG =  pxOn[1] - pxOff[1];
 				int dB =  pxOn[2] - pxOff[2];
-				if (dG > tolerance) {//TODO fix
+				if (dG > tolerance && (dR < dG - 10 || dR < tolerance)) {//TODO fix
 					result[idxY][idxX] = true;
 					imgFlt.setRGB(x, y, 0xFFFFFF);
 				}
