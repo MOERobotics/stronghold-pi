@@ -109,7 +109,7 @@ public abstract class AbstractImageProcessor<R> implements Runnable, BiFunction<
 			frame.recycle();
 			return false;
 		}
-		VideoFrame oldFrame = (flash ? frameOn : frameOff).getAndSet(frame);
+		VideoFrame oldFrame = (flash ? frameOff : frameOn).getAndSet(frame);
 		if (oldFrame != null)
 			oldFrame.recycle();
 		return true;
@@ -153,10 +153,8 @@ public abstract class AbstractImageProcessor<R> implements Runnable, BiFunction<
 							this.resultConsumer.accept(result);
 						
 						//release the processed frames
-						frameOff.get().recycle();
-						frameOff.set(null);
-						frameOn.get().recycle();
-						frameOn.set(null);
+						frameOff.getAndSet(null).recycle();
+						frameOn.getAndSet(null).recycle();
 					}
 				} finally {
 					//release the lock on images

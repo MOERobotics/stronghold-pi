@@ -18,6 +18,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.moe365.mopi.CommandLineParser.ParsedCommandLineArguments;
 import com.moe365.mopi.geom.Polygon;
@@ -35,7 +36,6 @@ import com.pi4j.io.gpio.RaspiPin;
 
 import au.edu.jcu.v4l4j.Control;
 import au.edu.jcu.v4l4j.ControlList;
-import au.edu.jcu.v4l4j.DeviceInfo;
 import au.edu.jcu.v4l4j.ImagePalette;
 import au.edu.jcu.v4l4j.JPEGFrameGrabber;
 import au.edu.jcu.v4l4j.V4L4JConstants;
@@ -145,9 +145,6 @@ public class Main {
 		
 		final AbstractImageProcessor<?> tracer = processor = initProcessor(parsed, server, client);
 		
-		//The state of the LED. Used for timing.
-		final AtomicBoolean ledState = new AtomicBoolean(false);
-		
 		
 		// Run test, if required
 		if (parsed.isFlagSet("--test")) {
@@ -169,29 +166,50 @@ public class Main {
 		final int jpegQuality = parsed.getOrDefault("--jpeg-quality", 80);
 		System.out.println("JPEG quality: " + jpegQuality + "%");
 		if (device != null) {
-			final JPEGFrameGrabber fg = frameGrabber = device.getJPEGFrameGrabber(width, height, 0, V4L4JConstants.STANDARD_WEBCAM, jpegQuality);
+			final JPEGFrameGrabber fg = frameGrabber = device.getJPEGFrameGrabber(width, height, 0, V4L4JConstants.STANDARD_WEBCAM, jpegQuality,
+					device.getDeviceInfo().getFormatList().getNativeFormatOfType(ImagePalette.YUYV));
 			fg.setFrameInterval(parsed.getOrDefault("--fps-num", 1), parsed.getOrDefault("--fps-denom", 10));
 			System.out.println("Framerate: " + fg.getFrameInterval());
 			
+			
+			final AtomicBoolean ledState = new AtomicBoolean(false);
+			
+			final AtomicLong ledUpdateTimestamp = new AtomicLong(0);
+			
+			final int gpioLatency = parsed.getOrDefault("--gpio-latency", 5);
+			
 			fg.setCaptureCallback(frame -> {
 					try {
-						if (server != null && ledState.get())
+						//Drop frames taken before the LED had time to flash
+						long currentTimestamp = frame.getCaptureTime();
+						final long newTimestamp = System.nanoTime() / 1000 + gpioLatency;
+						if (ledUpdateTimestamp.accumulateAndGet(currentTimestamp, (threshold, frameTimestamp)->(frameTimestamp >= threshold ? newTimestamp : threshold)) != newTimestamp) {
+							frame.recycle();
+							return;
+						}
+						
+						//Toggle GPIO pin (change the LED's state)
+						boolean state = !ledState.get();
+						gpioPin.setState(state || (!processorEnabled));
+						ledState.set(state);
+						
+						//Offer frame to server & tracer
+						if (server != null && !state)
+							//Only offer frames that were taken while the light was on 
 							server.offerFrame(frame);
+						
 						if (tracer != null && processorEnabled) {
+							//The tracer will call frame.recycle() when it's done with the frame
 							tracer.offerFrame(frame, ledState.get());
 						} else {
 							frame.recycle();
 						}
-//						System.out.println("Frame, " + ledState.get() + ", " + fg.getNumberOfRecycledVideoFrames());
-						boolean state = !ledState.get();
-						ledState.set(state);
-						gpioPin.setState(state || (!processorEnabled));
 					} catch (Exception e) {
 						//Make sure to print any/all exceptions
 						e.printStackTrace();
 						throw e;
 					}
-				}, 
+				},
 				e -> {
 					e.printStackTrace();
 					fg.stopCapture();
@@ -608,6 +626,7 @@ public class Main {
 			.alias("-p", "--port")
 			// GPIO options
 			.addKvPair("--gpio-pin", "pin number", "Set which GPIO pin to use. Is ignored if --no-gpio is set")
+			.addKvPair("--gpio-latency", "ms", "Set latency for GPIO writes")
 			// Image processor options
 			.addKvPair("--x-skip", "px", "Number of pixels to skip on the x axis when processing sweep 1 (not implemented)")
 			.addKvPair("--y-skip", "px", "Number of pixels to skip on the y axis when processing sweep 1 (not implemented)")
