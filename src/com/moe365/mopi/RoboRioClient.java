@@ -12,7 +12,6 @@ import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
 import com.mindlin.mdns.DnsClass;
 import com.mindlin.mdns.DnsMessage;
@@ -315,6 +314,7 @@ public class RoboRioClient implements Closeable {
 		buffer.limit(buffer.capacity());
 		buffer.putInt(packetNum.getAndIncrement());
 		buffer.putShort(status);
+		buffer.putShort(ack);
 	}
 	
 	protected void send(ByteBuffer buffer) throws IOException {
@@ -324,6 +324,7 @@ public class RoboRioClient implements Closeable {
 			System.err.println("Dropped packet to Rio");
 			return;
 		}
+		
 		DatagramPacket packet = new DatagramPacket(buffer.array(), buffer.position(), buffer.limit(), address);
 		try {
 			socket.send(packet);
