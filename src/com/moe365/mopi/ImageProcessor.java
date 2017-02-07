@@ -1,84 +1,76 @@
 package com.moe365.mopi;
 
 import java.awt.image.BufferedImage;
-import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-import javax.imageio.ImageIO;
-
 import com.moe365.mopi.geom.PreciseRectangle;
 import com.moe365.mopi.processing.AbstractImageProcessor;
+import com.moe365.mopi.processing.DebuggingDiffGenerator;
+import com.moe365.mopi.processing.DiffGenerator;
 
 import au.edu.jcu.v4l4j.VideoFrame;
 
 public class ImageProcessor extends AbstractImageProcessor<List<PreciseRectangle>> {
+	public static final int DEFAULT_TOLERANCE = 70;
+	
+	protected final DiffGenerator diff;
+	
 	/**
-	 * Whether to save the diff generated.
+	 * Smallest allowed width of a bounding box, in pixels.
+	 * 
+	 * Decreasing the value of this constant will find smaller blobs,
+	 * but will be more computationally expensive.
 	 */
-	public boolean saveDiff = false;
-	protected final AtomicInteger i = new AtomicInteger(0);
-	public ImageProcessor(int width, int height, Consumer<List<PreciseRectangle>> handler) {
-		super(0, 0, width, height, handler);
+	protected final int minBlobWidth;
+	
+	/**
+	 * Smallest allowed height of a bounding box.
+	 * @see #minBlobWidth
+	 */
+	protected final int minBlobHeight;
+	
+	public ImageProcessor(int frameWidth, int frameHeight, int minBlobWidth, int minBlobHeight, Consumer<List<PreciseRectangle>> handler) {
+		this(frameWidth, frameHeight, minBlobWidth, minBlobHeight, handler, false);
 	}
 	
-	public boolean[][] calcDeltaWithDiff(VideoFrame frameOn, VideoFrame frameOff) {
-		// calculated yet)
-		boolean[][] processed = new boolean[getFrameHeight()][getFrameWidth()];
-		// boolean array of the results. A cell @ result[y][x] is only
-		// valid if processed[y][x] is true.
-		boolean[][] result = new boolean[getFrameHeight()][getFrameWidth()];
-		BufferedImage imgR = new BufferedImage(getFrameWidth(), getFrameHeight(), BufferedImage.TYPE_INT_RGB);
-		BufferedImage imgG = new BufferedImage(getFrameWidth(), getFrameHeight(), BufferedImage.TYPE_INT_RGB);
-		BufferedImage imgB = new BufferedImage(getFrameWidth(), getFrameHeight(), BufferedImage.TYPE_INT_RGB);
-		BufferedImage imgFlt = new BufferedImage(getFrameWidth(), getFrameHeight(), BufferedImage.TYPE_INT_RGB);
-		System.out.println("Calculating...");
-		BufferedImage offImg = frameOff.getBufferedImage();
-		BufferedImage onImg = frameOn.getBufferedImage();
-		System.out.println("CM: " + onImg.getColorModel());
-		System.out.println("CMCL: " + onImg.getColorModel().getClass());
-		int[] pxOn = new int[3], pxOff = new int[3];
-		for (int y = frameMinY + step; y < frameMaxY - step; y += step) {
-			final int idxY = y - frameMinY;
-			for (int x = frameMinX + step + ((y % (2 * step) == 0) ? step/2 : 0); x < frameMaxX; x += step) {
-				final int idxX = x - frameMinX;
-				if (processed[idxY][idxX])
-					continue;
-				processed[idxY][idxX] = true;
-				splitRGB(onImg.getRGB(x, y), pxOn);
-				splitRGB(offImg.getRGB(x, y), pxOff);
-				int dR = pxOn[0] - pxOff[0];
-				int dG =  pxOn[1] - pxOff[1];
-				int dB =  pxOn[2] - pxOff[2];
-				if (dG > tolerance && (dR < dG - 10 || dR < tolerance)) {//TODO fix
-					result[idxY][idxX] = true;
-					imgFlt.setRGB(x, y, 0xFFFFFF);
-				}
-				imgR.setRGB(x, y, saturateByte(dR) << 16);
-				imgG.setRGB(x, y, saturateByte(dG) << 8);
-				imgB.setRGB(x, y, saturateByte(dB));
+	public ImageProcessor(int frameWidth, int frameHeight, int minBlobWidth, int minBlobHeight, Consumer<List<PreciseRectangle>> handler, boolean saveDiff) {
+		super(0, 0, frameWidth, frameHeight, handler);
+		
+		if (saveDiff)
+			this.diff = new DebuggingDiffGenerator(0, 0, frameWidth, frameHeight, DEFAULT_TOLERANCE);
+		else
+			this.diff = new DiffGenerator(0, 0, frameWidth, frameHeight, DEFAULT_TOLERANCE);
+		
+		this.minBlobWidth = minBlobWidth;
+		this.minBlobHeight = minBlobHeight;
+	}
+	
+	
+	/**
+	 * Try to split the image horizontally (perpendicular to the Y axis)
+	 * @param img Image
+	 * @param xMin Left bound of search area
+	 * @param xMax Right bound of search area
+	 * @param yMin Bottom of search area
+	 * @param yMax Top of search area
+	 * @return The index that can be split at, or -1 if no split is found
+	 */
+	private static final int splitH(boolean[][] img, final int xMin, final int xMax, final int yMin, final int yMax) {
+		int step = nextPowerOf2(yMax - yMin);
+		while (step > 2) {
+			outer: for (int split = yMin + step / 2; split < yMax; split += step) {
+				boolean[] row = img[split];
+				for (int x = xMin; x < xMax; x++)
+					if (row[x])
+						continue outer;
+				return split;
 			}
+			step /= 2;
 		}
-		try {
-			File imgDir = new File("img");
-			if (!(imgDir.exists() && imgDir.isDirectory()))
-				imgDir.mkdirs();
-			int num = i.getAndIncrement();
-			File file = new File(imgDir, "delta" + num + ".png");
-			System.out.println("Saving image to " + file);
-			ImageIO.write(imgR, "PNG", new File(imgDir, "dr" + num + ".png"));
-			ImageIO.write(imgG, "PNG", new File(imgDir, "dg" + num + ".png"));
-			ImageIO.write(imgB, "PNG", new File(imgDir, "db" + num + ".png"));
-			ImageIO.write(onImg, "PNG", new File(imgDir, "on" + num + ".png"));
-			ImageIO.write(offImg, "PNG", new File(imgDir, "off" + num + ".png"));
-			ImageIO.write(imgFlt, "PNG", file);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return result;
+		return -1;
 	}
 	public boolean[][] calcDeltaAdv(VideoFrame frameOn, VideoFrame frameOff) {
 		// Whether the value of any cell in result[][] is valid (has been
@@ -130,12 +122,11 @@ public class ImageProcessor extends AbstractImageProcessor<List<PreciseRectangle
 	}
 
 	@Override
-	public  List<PreciseRectangle> apply(VideoFrame frameOn, VideoFrame frameOff) {
-		boolean[][] result;
-		if (saveDiff)
-			result = calcDeltaWithDiff(frameOn, frameOff);
-		else
-			result = calcDeltaAdv(frameOn, frameOff);
+	public List<PreciseRectangle> apply(VideoFrame frameOn, VideoFrame frameOff) {
+		BufferedImage offImg = frameOff.getBufferedImage();
+		BufferedImage onImg = frameOn.getBufferedImage();
+		//TODO maybe add null check for images
+		boolean[][] result = this.diff.apply(onImg, offImg);
 		if (result == null)
 			return null;
 		return processBooleanMap(result);
