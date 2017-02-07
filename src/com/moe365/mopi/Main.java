@@ -433,9 +433,7 @@ public class Main {
 				//Offer the rectangles to be put in the SSE stream
 				if (httpServer != null)
 					httpServer.offerRectangles(rectangles);
-			});
-			if (args.isFlagSet("--save-diff"))
-				processor.saveDiff = true;
+			}, args.isFlagSet("--save-diff"));
 			Main.processor = processor;
 		}
 		Main.processor.start();
