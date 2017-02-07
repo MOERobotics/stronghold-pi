@@ -1,15 +1,25 @@
 package com.moe365.mopi.processing;
 
-public class ImageDiffGenerator implements BiFunction<BuffferedImage, BufferedImage, boolean[][]> {
+import java.awt.image.BufferedImage;
+import java.util.function.BiFunction;
+
+public class DiffGenerator implements BiFunction<BufferedImage, BufferedImage, boolean[][]> {
 	protected final int frameMinX, frameMaxX, frameMinY, frameMaxY;
-	protected final int tolerance = 70;
+	protected final int tolerance;//70
+	
+	public DiffGenerator(int frameMinX, int frameMinY, int frameMaxX, int frameMaxY, int tolerance) {
+		this.frameMinX = frameMinX;
+		this.frameMinY = frameMinY;
+		this.frameMaxX = frameMaxX;
+		this.frameMaxY = frameMaxY;
+		this.tolerance = tolerance;
+	}
+	
+	@Override
 	public boolean[][] apply(BufferedImage onImg, BufferedImage offImg) {
 		// boolean array of the results. A cell @ result[y][x] is only
-		// valid if processed[y][x] is true.
-		boolean[][] result = new boolean[getFrameHeight()][getFrameWidth()];
+		boolean[][] result = new boolean[this.frameMaxY - this.frameMinY][this.frameMaxX - this.frameMinX];
 		System.out.println("Calculating...");
-		BufferedImage offImg = frameOff.getBufferedImage();
-		BufferedImage onImg = frameOn.getBufferedImage();
 		int[] pxOn = new int[3], pxOff = new int[3];
 		for (int y = frameMinY; y < frameMaxY; y++) {
 			//Y index into result array
@@ -19,8 +29,8 @@ public class ImageDiffGenerator implements BiFunction<BuffferedImage, BufferedIm
 				final int idxX = x - frameMinX;
 				
 				//Calculate deltas
-				splitRGB(onImg.getRGB(x, y), pxOn);
-				splitRGB(offImg.getRGB(x, y), pxOff);
+				AbstractImageProcessor.splitRGB(onImg.getRGB(x, y), pxOn);
+				AbstractImageProcessor.splitRGB(offImg.getRGB(x, y), pxOff);
 				int dR = pxOn[0] - pxOff[0];
 				int dG =  pxOn[1] - pxOff[1];
 				int dB =  pxOn[2] - pxOff[2];
