@@ -42,6 +42,15 @@ public abstract class AbstractImageProcessor<R> implements Runnable, BiFunction<
 	}
 	
 	/**
+	 * Find the power of two greater or equal to the value 
+	 * @param value
+	 * @return
+	 */
+	public static int nextPowerOf2(final int value) {
+		return 1 << (32 - Integer.numberOfLeadingZeros(value - 1));
+	}
+	
+	/**
 	 * Whether the processor is currently processing images. If this lock
 	 * set to true, calls to {@link #offerFrame(VideoFrame, boolean)} should
 	 * do nothing and return false.
