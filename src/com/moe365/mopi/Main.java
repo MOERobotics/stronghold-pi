@@ -71,6 +71,8 @@ import au.edu.jcu.v4l4j.exceptions.V4L4JException;
  */
 public class Main {
 	public static final int DEFAULT_PORT = 5800;
+	public static final int BOILER_TARGET_WIDTH = 20;
+	public static final int BOILER_TARGET_HEIGHT = 7;
 	/**
 	 * Version string. Should be semantically versioned.
 	 * @see <a href="semver.org">semver.org</a>
@@ -403,7 +405,7 @@ public class Main {
 			});
 			Main.processor = processor;
 		} else {
-			ImageProcessor processor = new ImageProcessor(width, height, 0, 0, rectangles-> {
+			ImageProcessor processor = new ImageProcessor(width, height, BOILER_TARGET_WIDTH, BOILER_TARGET_HEIGHT, rectangles-> {
 				//Filter based on aspect ratio (height/width)
 				//The targets for Steamworks are pretty close to 1:8, so filter out
 				//things that are more square-ish
