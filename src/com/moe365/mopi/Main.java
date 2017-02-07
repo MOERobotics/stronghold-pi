@@ -403,12 +403,15 @@ public class Main {
 			});
 			Main.processor = processor;
 		} else {
-			ImageProcessor processor = new ImageProcessor(width, height, rectangles-> {
-				//Filter based on AR
+			ImageProcessor processor = new ImageProcessor(width, height, 0, 0, rectangles-> {
+				//Filter based on aspect ratio (height/width)
+				//The targets for Steamworks are pretty close to 1:8, so filter out
+				//things that are more square-ish
 				rectangles.removeIf(rectangle-> {
 					double ar = rectangle.getHeight() / rectangle.getWidth();
-					return ar < .1 || ar > 10;
+					return ar > (1/6f) || ar < (1/16f);
 				});
+				
 				//print the rectangles' dimensions to STDOUT
 				for (PreciseRectangle rectangle : rectangles)
 					System.out.println("=> " + rectangle);
