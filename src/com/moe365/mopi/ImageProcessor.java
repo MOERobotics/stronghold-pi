@@ -16,8 +16,6 @@ import com.moe365.mopi.processing.AbstractImageProcessor;
 import au.edu.jcu.v4l4j.VideoFrame;
 
 public class ImageProcessor extends AbstractImageProcessor<List<PreciseRectangle>> {
-	public static final int MIN_SIZE = 8;
-	public static final int step = 1, tolerance = 70;
 	/**
 	 * Whether to save the diff generated.
 	 */
