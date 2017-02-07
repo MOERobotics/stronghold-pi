@@ -11,12 +11,12 @@ public class BoundingBoxThing {
 	 * Decreasing the value of this constant will find smaller blobs,
 	 * but will be more computationally expensive.
 	 */
-	private static final int MIN_WIDTH = 25;
+	private static final int MIN_WIDTH = 20;
 	/**
 	 * Smallest allowed height of a bounding box.
 	 * @see #MIN_WIDTH
 	 */
-	private static final int MIN_HEIGHT = 16;
+	private static final int MIN_HEIGHT = 7;
 	
 	/**
 	 * Find the power of two greater or equal to the value 
