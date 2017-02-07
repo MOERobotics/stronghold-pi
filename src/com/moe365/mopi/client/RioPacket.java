@@ -1,7 +1,7 @@
 package com.moe365.mopi.client;
 import java.nio.ByteBuffer;
 
-public class RioPacket {
+public interface RioPacket {
 	/**
 	 * Get the status code for this packet
 	 */

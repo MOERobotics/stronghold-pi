@@ -1,4 +1,4 @@
-package com.moe365.mopi;
+package com.moe365.mopi.client;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -102,7 +102,7 @@ import com.moe365.mopi.geom.PreciseRectangle;
  * </section>
  * @author mailmindlin
  */
-public abstract class RoboRioClient implements Closeable {
+public abstract class RioClient implements Closeable {
 	public static final int SERVER_PORT = 5801;
 	public static final int RIO_PORT = 5801;
 	public static final boolean PREFER_IP6 = true;
@@ -162,40 +162,6 @@ public abstract class RoboRioClient implements Closeable {
 	}
 	
 	void broadcast(RioPacket packet) throws IOException;
-	
-	protected void send(ByteBuffer buffer) throws IOException {
-		SocketAddress address = this.address;
-		synchronized (socket) {
-		if (address == null || !socket.isBound()) {
-			System.err.println("Dropped packet to Rio");
-			return;
-		}
-		
-		DatagramPacket packet = new DatagramPacket(buffer.array(), buffer.position(), buffer.limit(), address);
-		try {
-			socket.send(packet);
-			System.out.println("Sent packet to Rio");
-		} catch (IOException e) {
-			this.resetSocket();
-			SocketAddress addr2 = this.address;
-			if (addr2 == null || !socket.isBound())
-				return;
-			if (addr2 != address)
-				//Can we just change the address w/o creating a new object?
-				packet = new DatagramPacket(buffer.array(), buffer.position(), buffer.limit(), addr2);
-			try {
-				socket.send(packet);
-				System.out.println("Sent packet to Rio");
-			} catch (Throwable t) {
-				t.printStackTrace();
-				throw t;
-			}
-		} catch (Throwable t) {
-			t.printStackTrace();
-			throw t;
-		}
-		}
-	}
 	
 	public void write(short status) throws IOException {
 		build(status, (short) 0);

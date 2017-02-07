@@ -1,5 +1,27 @@
 package com.moe365.mopi.client;
 
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
+import java.net.SocketAddress;
+import java.net.SocketException;
+import java.nio.ByteBuffer;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import com.mindlin.mdns.DnsClass;
+import com.mindlin.mdns.DnsMessage;
+import com.mindlin.mdns.DnsQuery;
+import com.mindlin.mdns.DnsRecord;
+import com.mindlin.mdns.DnsType;
+import com.mindlin.mdns.FQDN;
+import com.mindlin.mdns.MDNSListener;
+import com.mindlin.mdns.rdata.AddressRDATA;
+import com.moe365.mopi.RoboRioClient;
+
 public class MDNSRioClient extends RioClient {
 	/**
 	 * RoboRIO's address. May change as it is continually resolved. NOT thread safe.s
@@ -58,11 +80,11 @@ public class MDNSRioClient extends RioClient {
 	 * @throws SocketException 
 	 * @throws IOException
 	 */
-	public RoboRioClient() throws SocketException, IOException {
-		this(new InetSocketAddress(RIO_ADDRESS, RIO_PORT));
+	public MDNSRioClient() throws SocketException, IOException {
+		this(Executors.newSingleThreadExecutor(), SERVER_PORT, RIO_ADDRESS, RIO_PORT);
 	}
 	
-	public RoboRioClient(ExecutorService executor) throws SocketException, IOException {
+	public MDNSRioClient(ExecutorService executor) throws SocketException, IOException {
 		this(executor, SERVER_PORT, RIO_ADDRESS, RIO_PORT);
 	}
 	
@@ -74,7 +96,7 @@ public class MDNSRioClient extends RioClient {
 	 * @throws SocketException
 	 * @throws IOException
 	 */
-	public RoboRioClient(ExecutorService executor, int serverPort, String hostname, int rioPort) throws SocketException, IOException {
+	public MDNSRioClient(ExecutorService executor, int serverPort, String hostname, int rioPort) throws SocketException, IOException {
 		this(executor, RESOLVE_RETRY_TIME, null, serverPort, hostname, rioPort);
 	}
 	
@@ -90,7 +112,7 @@ public class MDNSRioClient extends RioClient {
 	 * @throws SecurityException
 	 *             If this program is not allowed to connect to the given socket
 	 */
-	public RoboRioClient(ExecutorService executor, long resolveRetryTime, NetworkInterface netIf, int serverPort, String hostname, int rioPort) throws SocketException, IOException {
+	public MDNSRioClient(ExecutorService executor, long resolveRetryTime, NetworkInterface netIf, int serverPort, String hostname, int rioPort) throws SocketException, IOException {
 		this.executor = executor;
 		this.resolveRetryTime = resolveRetryTime;
 		this.serverPort = serverPort;
@@ -114,6 +136,40 @@ public class MDNSRioClient extends RioClient {
 		this.socket.setReuseAddress(true);
 		this.resetSocket();
 		System.out.println("Resolving to RIO " + serverPort + " => @ " + hostname + ':' + rioPort);
+	}
+	
+	protected send(ByteBuffer buffer) throws IOException {
+		SocketAddress address = this.address;
+		synchronized (socket) {
+		if (address == null || !socket.isBound()) {
+			System.err.println("Dropped packet to Rio");
+			return;
+		}
+		
+		DatagramPacket packet = new DatagramPacket(buffer.array(), buffer.position(), buffer.limit(), address);
+		try {
+			socket.send(packet);
+			System.out.println("Sent packet to Rio");
+		} catch (IOException e) {
+			this.resetSocket();
+			SocketAddress addr2 = this.address;
+			if (addr2 == null || !socket.isBound())
+				return;
+			if (addr2 != address)
+				//Can we just change the address w/o creating a new object?
+				packet = new DatagramPacket(buffer.array(), buffer.position(), buffer.limit(), addr2);
+			try {
+				socket.send(packet);
+				System.out.println("Sent packet to Rio");
+			} catch (Throwable t) {
+				t.printStackTrace();
+				throw t;
+			}
+		} catch (Throwable t) {
+			t.printStackTrace();
+			throw t;
+		}
+		}
 	}
 	
 	protected void resetSocket() throws IOException {
