@@ -22,8 +22,15 @@ public abstract class AbstractRioClient implements RioClient {
 	
 	@Override
 	public void broadcast(RioPacket packet) throws IOException {
-		//TODO finish
-		throw new UnsupportedOperationException();
+		synchronized (buffer) {
+			buffer.clear();
+			buffer.putInt(packetNum.incrementAndGet());
+			buffer.putShort((short)packet.getStatus());
+			buffer.putShort((short)0);
+			packet.writeTo(buffer);
+			buffer.flip();
+			send(buffer);
+		}
 	}
 	
 	protected abstract void send(ByteBuffer buffer) throws IOException;
