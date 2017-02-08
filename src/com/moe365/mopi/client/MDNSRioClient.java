@@ -22,7 +22,7 @@ import com.mindlin.mdns.MDNSListener;
 import com.mindlin.mdns.rdata.AddressRDATA;
 import com.moe365.mopi.RoboRioClient;
 
-public class MDNSRioClient extends RioClient {
+public class MDNSRioClient extends AbstractRioClient {
 	/**
 	 * RoboRIO's address. May change as it is continually resolved. NOT thread safe.s
 	 */
@@ -138,7 +138,8 @@ public class MDNSRioClient extends RioClient {
 		System.out.println("Resolving to RIO " + serverPort + " => @ " + hostname + ':' + rioPort);
 	}
 	
-	protected send(ByteBuffer buffer) throws IOException {
+	@Override
+	protected void send(ByteBuffer buffer) throws IOException {
 		SocketAddress address = this.address;
 		synchronized (socket) {
 		if (address == null || !socket.isBound()) {
@@ -217,5 +218,14 @@ public class MDNSRioClient extends RioClient {
 			return;
 		if (!addr.equals(this.address))
 			System.out.println("Resolved rio address to " + (this.address = new InetSocketAddress(addr, this.rioPort)));
+	}
+	
+
+	
+	@Override
+	public void close() {
+		if (this.mdnsListener != null)
+			this.mdnsListener.close();
+		this.socket.close();
 	}
 }
