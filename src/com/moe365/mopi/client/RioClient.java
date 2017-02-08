@@ -100,6 +100,10 @@ public interface RioClient extends Closeable {
 	 */
 	public static final String RIO_ADDRESS = "roboRIO-365-FRC.local";
 	
+	default void start() throws IOException {
+		this.broadcast(new HelloRioPacket());
+	}
+	
 	void broadcast(RioPacket packet) throws IOException;
 	
 	default void writeNoneFound() throws IOException {

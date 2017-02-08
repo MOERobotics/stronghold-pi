@@ -6,8 +6,6 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.SocketException;
 
-import com.mindlin.mdns.FQDN;
-
 public class StaticRioClient implements RioClient {
 	
 	protected final int serverPort;
@@ -39,5 +37,18 @@ public class StaticRioClient implements RioClient {
 		}
 		this.socket = new DatagramSocket(this.serverPort);
 		System.out.println("Connecting to RIO: " + serverPort + " => " + addr);
+	}
+	
+	@Override
+	public void broadcast(RioPacket packet) throws IOException {
+		// TODO Auto-generated method stub
+		
+	}
+	
+
+	@Override
+	public void close() throws IOException {
+		// TODO Auto-generated method stub
+		
 	}
 }

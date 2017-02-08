@@ -20,7 +20,6 @@ import com.mindlin.mdns.DnsType;
 import com.mindlin.mdns.FQDN;
 import com.mindlin.mdns.MDNSListener;
 import com.mindlin.mdns.rdata.AddressRDATA;
-import com.moe365.mopi.RoboRioClient;
 
 public class MDNSRioClient extends AbstractRioClient {
 	/**
@@ -34,15 +33,9 @@ public class MDNSRioClient extends AbstractRioClient {
 	protected final NetworkInterface netIf;
 	
 	/**
-	 * UDP socket to datagrams from.
+	 * UDP socket to packets from.
 	 */
 	protected final DatagramSocket socket;
-	
-	/**
-	 * Buffer backing packets.
-	 * TODO fix multithreading issues
-	 */
-	protected final ByteBuffer buffer = ByteBuffer.allocate(RoboRioClient.BUFFER_SIZE);
 	
 	/**
 	 * Executor to run background tasks on. May be null if not attempting to resolve address.
