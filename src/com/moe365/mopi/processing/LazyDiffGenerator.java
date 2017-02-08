@@ -4,6 +4,16 @@ import java.awt.image.BufferedImage;
 import java.util.function.BiFunction;
 
 public class LazyDiffGenerator implements BiFunction<BufferedImage, BufferedImage, BinaryImage> {
+	//Left-shift by column
+	private static final long COL_MASK = dup(0x01);
+			
+	private static long dup(int b) {
+		long r = b | (b << 16);
+		r |= r << 8;
+		r |= r << 32;
+		return r;
+	}
+	
 	protected final int frameMinX, frameMaxX, frameMinY, frameMaxY;
 	protected final int tolerance;//70
 	
@@ -36,7 +46,7 @@ public class LazyDiffGenerator implements BiFunction<BufferedImage, BufferedImag
 			int db = b1 - b2;
 			
 			if (dg > tolerance && (dr < dg - 10 || dr < tolerance))
-				result |= 1L << (64 - i);
+				result |= 1L << i;
 		}
 		return result;
 	}
@@ -57,12 +67,14 @@ public class LazyDiffGenerator implements BiFunction<BufferedImage, BufferedImag
 		final int xTiles = (width + 7) / 8;
 		final int yTiles= (height + 7) / 8;
 		final long[][] tiles = new long[yTiles][xTiles];
+		
+		//Arrays to store the RGB pixels used to calculate each chunk
 		int[] onPixels = new int[64];
 		int[] offPixels = new int[64];
+		
 		for (int v = 0; v < height / 8; v++) {
 			long[] tilesRow = tiles[v];
 			for (int u = 0; u < width / 8; u++) {
-				//Get chunk
 				onImg.getRGB(u * 8, v * 8, 8, 8, onPixels, 0, 8);
 				offImg.getRGB(u * 8, v * 8, 8, 8, offPixels, 0, 8);
 				tilesRow[u] = evalTile(onPixels, offPixels);
@@ -97,24 +109,37 @@ public class LazyDiffGenerator implements BiFunction<BufferedImage, BufferedImag
 		}
 		
 		return new BinaryImage() {
-			//Left-shift by column
-			private static final long COL_MASK = 0x0101010101010101;
 			
 			@Override
 			public boolean test(int x, int y) {
 				long tile = tiles[x / 8][y / 8];
-				return tile & (1L << ((y % 8) * 8 + x % 8));
+				return tile & (1L << ((y % 8) * 8 + x % 8)) != 0;
 			}
 			
 			@Override
 			public boolean testRow(int y, int xMin, int xMax) {
 				//We can test rows and cols faster
 				final long mask = 0xFFL << (8 * (y % 8));
-				final long startMask = -1L;
-				final long endMask = -1L;
-				int v = y / 8;
-				int u = xMin / 8;
-				//TODO finish
+				final long maskI = dup(0xFF >> (xMin & 8));
+				//TODO could do with Integer.reverseBytes, but not sure if actually faster
+				final long maskF = dup(0xFF & (0xFF << x));
+				
+				final int v = y / 8;
+				final int uMin = xMin / 8;
+				final int uMax = xMax / 8;
+				final long[] tileRow = tiles[v];
+				
+				for (int u = uMin; u <= uMax; u++) {
+					long tile = tileRow[u] & mask;
+					if (tile != 0) {
+						if (u == uMin)
+							tile &= maskI;
+						if (u == uMax)
+							tile &= maskF;
+						if (tile != 0)
+							return true;
+					}
+				}
 				return false;
 			}
 			
@@ -122,50 +147,30 @@ public class LazyDiffGenerator implements BiFunction<BufferedImage, BufferedImag
 			public boolean testCol(int x, int yMin, int yMax) {
 				//Mask that only selects bits in our column
 				final long mask = COL_MASK << (x % 8);
-				final long mask0 = (-1L) >>> ((yMin % 8) * 8);
-				final long maskF;
+				//More masks for the first and last tiles, because we might not be using all of them
+				//-1L is the identity mask (all bits are on)
+				final long maskI = (-1L) >>> ((yMin % 8) * 8);
+				final long maskF = (-1L) << ((yMax % 8) * 8);
 				
 				final int u = x / 8;
-				int v = yMin / 8;
+				final int vMin = yMin / 8;
 				final int vMax = yMax / 8;
 				
-				long tile = tiles[v][u] & mask;
-				if (tile & mask0 != 0) {
-					if (v == vMax && (tile & maskF == 0))
-						return false;
-					return true;
+				//TODO we *could* load a bunch of masked tiles and (bitwise) or them together
+				//then test at the end.
+				for (int v = vMin; v <= vMax; v++) {
+					long tile = tiles[v][u] & mask;
+					if (tile != 0) {
+						if (v == vMin)
+							tile &= maskI;
+						if (v == vMax)
+							tile &= maskF;
+						if (tile != 0)
+							return true;
+					}
 				}
-				for (; v <= vMax; v++)
-					if ((tile = tiles[v][u] & mask) != 0)
-						return !(v == vMax && (tile & maskF == 0));
-				
 				return false;
 			}
 		};
-		// boolean array of the results. A cell @ result[y][x] is only
-		boolean[][] result = new boolean[this.frameMaxY - this.frameMinY][this.frameMaxX - this.frameMinX];
-		System.out.println("Calculating...");
-		int[] pxOn = new int[3], pxOff = new int[3];
-		for (int y = frameMinY; y < frameMaxY; y++) {
-			//Y index into result array
-			final int idxY = y - frameMinY;
-			for (int x = frameMinX; x < frameMaxX; x++) {
-				//X index into result array
-				final int idxX = x - frameMinX;
-				
-				//Calculate deltas
-				AbstractImageProcessor.splitRGB(onImg.getRGB(x, y), pxOn);
-				AbstractImageProcessor.splitRGB(offImg.getRGB(x, y), pxOff);
-				int dR = pxOn[0] - pxOff[0];
-				int dG =  pxOn[1] - pxOff[1];
-				int dB =  pxOn[2] - pxOff[2];
-				
-				//Decide whether the pixel is on. This predicate is kinda magic-y, but
-				//basically, it requires green to increase by a lot, but red not much.
-				if (dG > tolerance && (dR < dG - 10 || dR < tolerance))//TODO fix
-					result[idxY][idxX] = true;
-			}
-		}
-		return result;
 	}
 }
