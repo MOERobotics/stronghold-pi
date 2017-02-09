@@ -5,7 +5,7 @@ import java.util.function.BiFunction;
 
 public class LazyDiffGenerator implements BiFunction<BufferedImage, BufferedImage, BinaryImage> {
 	//Left-shift by column
-	private static final long COL_MASK = dup(0x01);
+	private static final long COL_MASK = dup(0b1000_0000);
 			
 	private static long dup(int b) {
 		long r = b | (b << 16);
@@ -30,12 +30,12 @@ public class LazyDiffGenerator implements BiFunction<BufferedImage, BufferedImag
 		//RGB array already matches our format
 		for (int i = 0; i < 64; i++) {
 			//Find RGB components of each pixel
-			int px1 = onPixels[i];
+			int px1 = onPx[i];
 			int r1 = (px1 & 0x00FF0000) >> 16;
 			int g1 = (px1 & 0x0000FF00) >> 8;
 			int b1 = (px1 & 0x000000FF) >> 0;
 			
-			int px2 = offPixels[i];
+			int px2 = offPx[i];
 			int r2 = (px2 & 0x00FF0000) >> 16;
 			int g2 = (px2 & 0x0000FF00) >> 8;
 			int b2 = (px2 & 0x000000FF) >> 0;
@@ -80,7 +80,7 @@ public class LazyDiffGenerator implements BiFunction<BufferedImage, BufferedImag
 				tilesRow[u] = evalTile(onPixels, offPixels);
 			}
 			
-			if (width & 8 != 0) {
+			if (width % 8 != 0) {
 				int u = width / 8;
 				//Rightmost tile column isn't complete
 				onImg.getRGB(u * 8, v * 8, width - u, 8, onPixels, 0, 8);
@@ -99,7 +99,7 @@ public class LazyDiffGenerator implements BiFunction<BufferedImage, BufferedImag
 				tilesRow[u] = evalTile(onPixels, offPixels);
 			}
 			
-			if (width & 8 != 0) {
+			if (width % 8 != 0) {
 				int u = width / 8;
 				//Rightmost tile column isn't complete
 				onImg.getRGB(u * 8, v * 8, width - u * 8, 8, onPixels, 0, 8);
@@ -112,17 +112,19 @@ public class LazyDiffGenerator implements BiFunction<BufferedImage, BufferedImag
 			
 			@Override
 			public boolean test(int x, int y) {
-				long tile = tiles[x / 8][y / 8];
-				return tile & (1L << ((y % 8) * 8 + x % 8)) != 0;
+				long tile = tiles[y / 8][x / 8];
+				long mask = (1L << ((y % 8) * 8 + x % 8));
+				return (tile & mask) != 0;
 			}
 			
 			@Override
 			public boolean testRow(int y, int xMin, int xMax) {
 				//We can test rows and cols faster
 				final long mask = 0xFFL << (8 * (y % 8));
+				//Mask the columns that are out of range on the first and last tiles
 				final long maskI = dup(0xFF >> (xMin & 8));
 				//TODO could do with Integer.reverseBytes, but not sure if actually faster
-				final long maskF = dup(0xFF & (0xFF << x));
+				final long maskF = dup(0xFF & (0xFF << xMax));
 				
 				final int v = y / 8;
 				final int uMin = xMin / 8;
@@ -131,7 +133,7 @@ public class LazyDiffGenerator implements BiFunction<BufferedImage, BufferedImag
 				
 				for (int u = uMin; u <= uMax; u++) {
 					long tile = tileRow[u] & mask;
-					if (tile != 0) {
+					if (tile != 0) {//This shouldn't be true often
 						if (u == uMin)
 							tile &= maskI;
 						if (u == uMax)
@@ -146,18 +148,17 @@ public class LazyDiffGenerator implements BiFunction<BufferedImage, BufferedImag
 			@Override
 			public boolean testCol(int x, int yMin, int yMax) {
 				//Mask that only selects bits in our column
-				final long mask = COL_MASK << (x % 8);
+				final long mask = COL_MASK >>> (x % 8);
 				//More masks for the first and last tiles, because we might not be using all of them
-				//-1L is the identity mask (all bits are on)
-				final long maskI = (-1L) >>> ((yMin % 8) * 8);
-				final long maskF = (-1L) << ((yMax % 8) * 8);
+				//Basically, we're cutting off the top or the bottom rows that we won't be using.
+				//Note that -1L is the identity mask (all bits are on)
+				final long maskI = (-1L) << ((yMin % 8) * 8);
+				final long maskF = (-1L) >>> ((yMax % 8) * 8);
 				
 				final int u = x / 8;
 				final int vMin = yMin / 8;
 				final int vMax = yMax / 8;
 				
-				//TODO we *could* load a bunch of masked tiles and (bitwise) or them together
-				//then test at the end.
 				for (int v = vMin; v <= vMax; v++) {
 					long tile = tiles[v][u] & mask;
 					if (tile != 0) {
