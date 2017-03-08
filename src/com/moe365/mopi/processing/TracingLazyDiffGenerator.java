@@ -17,7 +17,7 @@ public class TracingLazyDiffGenerator implements BiFunction<BufferedImage, Buffe
 	protected final int frameMinX, frameMaxX, frameMinY, frameMaxY;
 	protected final int tolerance;//70
 	
-	public LazyDiffGenerator(int frameMinX, int frameMinY, int frameMaxX, int frameMaxY, int tolerance) {
+	public TracingLazyDiffGenerator(int frameMinX, int frameMinY, int frameMaxX, int frameMaxY, int tolerance) {
 		this.frameMinX = frameMinX;
 		this.frameMinY = frameMinY;
 		this.frameMaxX = frameMaxX;

@@ -1,4 +1,4 @@
-package com.moe365.mopi.net.packet;
+package com.moe365.mopi.net.channel;
 
 /**
  * An enumeration of the available property types. Types are sent as a byte, by
@@ -7,6 +7,7 @@ package com.moe365.mopi.net.packet;
  * @author mailmindlin
  */
 public enum PropertyType {
+	BUTTON,
 	/**
 	 * A boolean property. Allowed values are <samp>true</samp> and
 	 * <samp>false</samp>.

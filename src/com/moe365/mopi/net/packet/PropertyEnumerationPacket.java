@@ -1,81 +1,65 @@
 package com.moe365.mopi.net.packet;
 
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
+import java.util.Collection;
+
+import com.moe365.mopi.net.channel.Property;
 
 /**
  * 
  * @author mailmindlin
  */
 public class PropertyEnumerationPacket extends AbstractMutableDataPacket {
-	PropertySignature[] signatures;
+	Collection<Property> properties;
 	
 	public PropertyEnumerationPacket() {
 		this.setTypeCode(PacketTypeCode.PROPERTY_ENUMERATION);
 	}
-	public PropertyEnumerationPacket(PropertySignature...signatures) {
+	
+	public PropertyEnumerationPacket(Collection<Property> properties) {
 		this();
-		this.signatures = signatures;
+		this.properties = properties;
 	}
+	
 	public PropertyEnumerationPacket(ByteBuffer buf) {
 		super(buf);
 		//TODO parse
-		final int length = buf.getShort() & 0xFF_FF;
+		//final int length = buf.getShort() & 0xFF_FF;
 		
 		this.setTypeCode(PacketTypeCode.PROPERTY_ENUMERATION);
 	}
 
 	public int getPropertiesCount() {
-		return signatures.length;
+		return properties.size();
 	}
 
-	public PropertySignature[] getProperties() {
-		return signatures;
+	public Collection<Property> getProperties() {
+		return properties;
 	}
 
 
 	@Override
 	public int getLength() {
-		return DataPacket.HEADER_LENGTH + 2 + signatures.length * 4;//TODO support names
+		int len = DataPacket.HEADER_LENGTH + 2 + properties.size() * 4;
+		for (Property property : properties) {
+			int strLen = property.getName().length();
+			len += strLen;
+			if (strLen > 0xFF)
+				len += 2;
+		}
+		return len;
 	}
 	
 	@Override
 	public ByteBuffer writeTo(ByteBuffer buf) {
 		super.writeTo(buf);
-		buf.putShort((short) signatures.length);
-		for (int i = 0; i < signatures.length; i++) {
-			PropertySignature signature = signatures[i];
-			buf.putShort((short) signature.id)
-				.put((byte)signature.getType().ordinal())
-				.put((byte)signature.getName().length());
-			//TODO write strings
+		buf.putShort((short) properties.size());
+		
+		for (Property property : properties) {
+			buf.putShort((short) property.getId())
+				.put((byte)property.getType().ordinal());
+			DataPacket.writeString(property.getName(), buf);
 		}
 		return buf;
-	}
-
-	public static class PropertySignature {
-		int id = -1;
-		PropertyType type;
-		String name;
-
-		PropertySignature(int id, PropertyType type, String name) {
-			this.id = id;
-			this.type = type;
-			if (name.getBytes(StandardCharsets.UTF_8).length > 255)
-				System.out.println("Invalid name length. All property names must be <255 bytes when UTF-8 encoded");
-			this.name = name;
-		}
-
-		public int getId() {
-			return id;
-		}
-
-		public PropertyType getType() {
-			return type;
-		}
-
-		public String getName() {
-			return name;
-		}
 	}
 }

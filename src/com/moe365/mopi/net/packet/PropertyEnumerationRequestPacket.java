@@ -9,8 +9,7 @@ public class PropertyEnumerationRequestPacket extends AbstractMutableDataPacket 
 	}
 	@Override
 	public int getLength() {
-		// TODO Auto-generated method stub
-		return 0;
+		return DataPacket.HEADER_LENGTH;
 	}
 	//No properties
 }
