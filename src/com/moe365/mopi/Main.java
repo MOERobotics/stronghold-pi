@@ -431,7 +431,7 @@ public class Main {
 			return null;
 		}
 		int port = args.getOrDefault("--udp-port", RoboRioClient.RIO_PORT);
-		int retryTime = args.getOrDefault("--mdns-resolve-retry", RoboRioClient.RESOLVE_RETRY_TIME);
+//		int retryTime = args.getOrDefault("--mdns-resolve-retry", RoboRioClient.RESOLVE_RETRY_TIME);
 		if (port < 0) {
 			System.out.println("CLIENT DISABLED (port)");
 			return null;
@@ -477,18 +477,23 @@ public class Main {
 			});
 			Main.processor = processor;
 		} else {
-			ImageProcessor processor = new ImageProcessor(width, height, BOILER_TARGET_WIDTH, BOILER_TARGET_HEIGHT, rectangles-> {
+			int targetWidth = args.getOrDefault("--target-width", BOILER_TARGET_WIDTH);
+			int targetHeight = args.getOrDefault("--target-height", BOILER_TARGET_HEIGHT);
+			System.out.println("Target dimensions: " + targetWidth + "x" + targetHeight);
+			ImageProcessor processor = new ImageProcessor(width, height, targetWidth, targetHeight, rectangles-> {
+//				System.out.println("Found " + rectangles.size() + " rects (preARfilter)");
 				//Filter based on aspect ratio (height/width)
 				//The targets for Steamworks are pretty close to 1:8, so filter out
 				//things that are more square-ish
-				rectangles.removeIf(rectangle-> {
+				/*rectangles.removeIf(rectangle -> {
 					double ar = rectangle.getHeight() / rectangle.getWidth();
 					return ar > (1/6f) || ar < (1/16f);
-				});
+				});*/
 				
+				System.out.println("Found " + rectangles.size() + " rects");
 				//print the rectangles' dimensions to STDOUT
 				for (PreciseRectangle rectangle : rectangles)
-					System.out.println("=> " + rectangle);
+					System.out.println("=> (" + (rectangle.getX() + (rectangle.getWidth()/2)) * 100.0 + "," + (rectangle.getY() + (rectangle.getHeight()/2)) * 100.0 + ")");
 				
 				//send the largest rectangle(s) to the Rio
 				try {
