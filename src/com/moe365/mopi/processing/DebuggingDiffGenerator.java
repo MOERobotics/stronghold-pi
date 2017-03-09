@@ -9,22 +9,23 @@ import javax.imageio.ImageIO;
 public class DebuggingDiffGenerator extends DiffGenerator {
 	
 	protected final AtomicInteger i = new AtomicInteger(0);
+	public BufferedImage imgFlt;
 
 	public DebuggingDiffGenerator(int frameMinX, int frameMinY, int frameMaxX, int frameMaxY, int tolerance) {
 		super(frameMinX, frameMinY, frameMaxX, frameMaxY, tolerance);
 	}
 	
 	@Override
-	public boolean[][] apply(BufferedImage onImg, BufferedImage offImg) {
+	public BinaryImage apply(BufferedImage onImg, BufferedImage offImg) {
 		// boolean array of the results. A cell @ result[y][x] is only
 		int height = this.frameMaxY - this.frameMinY;
 		int width = this.frameMaxX - this.frameMinX;
 		boolean[][] result = new boolean[height][width];
 		System.out.println("Calculating...");
-		BufferedImage imgR = new BufferedImage(width, width, BufferedImage.TYPE_INT_RGB);
-		BufferedImage imgG = new BufferedImage(width, width, BufferedImage.TYPE_INT_RGB);
-		BufferedImage imgB = new BufferedImage(width, width, BufferedImage.TYPE_INT_RGB);
-		BufferedImage imgFlt = new BufferedImage(width, width, BufferedImage.TYPE_INT_RGB);
+		BufferedImage imgR = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+		BufferedImage imgG = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+		BufferedImage imgB = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+		imgFlt = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
 		System.out.println("Calculating...");
 		System.out.println("CM: " + onImg.getColorModel());
 		System.out.println("CMCL: " + onImg.getColorModel().getClass());
@@ -66,6 +67,11 @@ public class DebuggingDiffGenerator extends DiffGenerator {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		return result;
+		return new BinaryImage() {
+			@Override
+			public boolean test(int x, int y) {
+				return result[y][x];
+			}
+		};
 	}
 }

@@ -3,7 +3,7 @@ package com.moe365.mopi.processing;
 import java.awt.image.BufferedImage;
 import java.util.function.BiFunction;
 
-public class DiffGenerator implements BiFunction<BufferedImage, BufferedImage, boolean[][]> {
+public class DiffGenerator implements BiFunction<BufferedImage, BufferedImage, BinaryImage> {
 	protected final int frameMinX, frameMaxX, frameMinY, frameMaxY;
 	protected final int tolerance;//70
 	
@@ -16,7 +16,7 @@ public class DiffGenerator implements BiFunction<BufferedImage, BufferedImage, b
 	}
 	
 	@Override
-	public boolean[][] apply(BufferedImage onImg, BufferedImage offImg) {
+	public BinaryImage apply(BufferedImage onImg, BufferedImage offImg) {
 		// boolean array of the results. A cell @ result[y][x] is only
 		boolean[][] result = new boolean[this.frameMaxY - this.frameMinY][this.frameMaxX - this.frameMinX];
 		System.out.println("Calculating...");
@@ -41,6 +41,12 @@ public class DiffGenerator implements BiFunction<BufferedImage, BufferedImage, b
 					result[idxY][idxX] = true;
 			}
 		}
-		return result;
+		
+		return new BinaryImage() {
+			@Override
+			public boolean test(int x, int y) {
+				return result[y][x];
+			}
+		};
 	}
 }
