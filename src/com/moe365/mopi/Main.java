@@ -179,31 +179,40 @@ public class Main {
 			
 			final AtomicLong ledUpdateTimestamp = new AtomicLong(0);
 			
-			final int gpioLatency = parsed.getOrDefault("--gpio-latency", 5);
+			final int gpioDelay = parsed.getOrDefault("--gpio-delay", 5);
 			
 			fg.setCaptureCallback(frame -> {
 					try {
+						boolean gpioState;
 						//Drop frames taken before the LED had time to flash
-						long currentTimestamp = frame.getCaptureTime();
-						final long newTimestamp = System.nanoTime() / 1000 + gpioLatency;
-						if (ledUpdateTimestamp.accumulateAndGet(currentTimestamp, (threshold, frameTimestamp)->(frameTimestamp >= threshold ? newTimestamp : threshold)) != newTimestamp) {
-							frame.recycle();
-							return;
+						if (gpioPin != null) {
+							long frameTimestamp = frame.getCaptureTime();
+							final long newTimestamp = System.nanoTime() / 1000 + gpioDelay;
+	//						System.out.format("F: %d C: %d U: %d N: %d\n", frameTimestamp, System.nanoTime() / 1000, ledUpdateTimestamp.get(), newTimestamp);
+							if (ledUpdateTimestamp.accumulateAndGet(frameTimestamp, (threshold, _frameTimestmp)->(_frameTimestmp >= threshold ? newTimestamp : threshold)) != newTimestamp) {
+								//Drop frame (it was old)
+	//							System.out.println("[drop frame]");
+								frame.recycle();
+								return;
+							}
+							
+							//Toggle GPIO pin (change the LED's state)
+							
+							gpioState = !ledState.get();
+							gpioPin.setState(gpioState || (!processorEnabled));
+							ledState.set(gpioState);
+						} else {
+							gpioState = false;
 						}
 						
-						//Toggle GPIO pin (change the LED's state)
-						boolean state = !ledState.get();
-						gpioPin.setState(state || (!processorEnabled));
-						ledState.set(state);
-						
 						//Offer frame to server & tracer
-						if (server != null && !state)
+						if (server != null && !gpioState)
 							//Only offer frames that were taken while the light was on 
 							server.offerFrame(frame);
 						
 						if (tracer != null && processorEnabled) {
 							//The tracer will call frame.recycle() when it's done with the frame
-							tracer.offerFrame(frame, ledState.get());
+							tracer.offerFrame(frame, gpioState);
 						} else {
 							frame.recycle();
 						}
