@@ -28,6 +28,7 @@ import com.moe365.mopi.geom.PreciseRectangle;
 import com.moe365.mopi.net.MPHttpServer;
 import com.moe365.mopi.processing.AbstractImageProcessor;
 import com.moe365.mopi.processing.ContourTracer;
+import com.moe365.mopi.processing.DebuggingDiffGenerator;
 import com.pi4j.io.gpio.GpioController;
 import com.pi4j.io.gpio.GpioFactory;
 import com.pi4j.io.gpio.GpioPinDigitalOutput;
@@ -37,6 +38,7 @@ import com.pi4j.io.gpio.RaspiPin;
 
 import au.edu.jcu.v4l4j.Control;
 import au.edu.jcu.v4l4j.ControlList;
+import au.edu.jcu.v4l4j.ImageFormat;
 import au.edu.jcu.v4l4j.ImagePalette;
 import au.edu.jcu.v4l4j.JPEGFrameGrabber;
 import au.edu.jcu.v4l4j.V4L4JConstants;
@@ -159,6 +161,9 @@ public class Main {
 				case "client":
 					testClient(client);
 					break;
+				case "processing":
+					testProcessing(processor, parsed);
+					break;
 				default:
 					System.err.println("Unknown test '" + target + "'");
 			}
@@ -264,6 +269,55 @@ public class Main {
 			rects.add(new PreciseRectangle(0.25,0.75,0.3,0.1));
 			server.offerRectangles(rects);
 			Thread.sleep(1000);
+		}
+	}
+	
+	private static long prof(ImageProcessor processor, BufferedImage[] on, BufferedImage[] off) {
+		final int len = on.length;
+		final int n = 50;
+		long[] sums = new long[len];
+		for (int i = 0; i < 50; i++) {
+			for (int j = 0; j < len; j++) {
+				long start = System.nanoTime();
+				processor.apply(on[j], off[j]);
+				long end = System.nanoTime();
+				sums[j] += (end - start) / n;
+			}
+		}
+		long result = 0;
+		for (int i = 0; i < len; i++)
+			result += sums[i] / len;
+		return result;
+	}
+	
+	protected static void testProcessing(AbstractImageProcessor<?> _processor, ParsedCommandLineArguments args) throws IOException, InterruptedException {
+		File dir = new File(args.get("--test-images"));
+		ImageProcessor processor = (ImageProcessor) _processor;
+		int numImages = 0;
+		List<Color> colors = Arrays.asList(Color.RED, Color.BLUE, Color.GREEN);
+		while (true) {
+			File onImgFile = new File(dir.getAbsolutePath(), "off" + numImages + ".png");
+			File offImgFile = new File(dir.getAbsolutePath(), "on" + numImages + ".png");
+			if (!(onImgFile.exists() && offImgFile.exists()))
+				break;
+			numImages++;
+			System.out.println("========== IMAGE " + numImages + " ===========");
+			BufferedImage onImg = ImageIO.read(onImgFile);
+			BufferedImage offImg = ImageIO.read(offImgFile);
+			List<PreciseRectangle> rectangles = processor.apply(onImg, offImg);
+			BufferedImage out = ((DebuggingDiffGenerator)processor.diff).imgFlt;
+			System.out.println("Found rectangles " + rectangles);
+
+			Graphics2D g = out.createGraphics();
+			int i = 0;
+			for (PreciseRectangle rect : rectangles) {
+				g.setColor(colors.get(i++));
+				g.drawRect((int)(rect.getX() * width), (int) (rect.getY() * height), (int) (rect.getWidth() * width), (int) (rect.getHeight() * height));
+			}
+			g.dispose();
+
+			File outFlt = new File("img", "flt" + numImages + ".png");
+			ImageIO.write(out, "PNG", outFlt);
 		}
 	}
 	
@@ -624,6 +678,7 @@ public class Main {
 			.addFlag("--version", "Print the version string.")
 			.addFlag("--out", "Specify where to write log messages to (not implemented)")
 			.addKvPair("--test", "target", "Run test by name. Tests include 'controls', 'client', and 'sse'.")
+			.addKvPair("--test-images", "dir", "Directory in which images for testing are put")
 			.addKvPair("--props", "file", "Specify the file to read properties from (not implemented)")
 			.addKvPair("--write-props", "file", "Write properties to file, which can be passed into the --props arg in the future (not implemented)")
 			.addFlag("--rebuild-parser", "Rebuilds the parser binary file")
@@ -640,12 +695,15 @@ public class Main {
 			.alias("-p", "--port")
 			// GPIO options
 			.addKvPair("--gpio-pin", "pin number", "Set which GPIO pin to use. Is ignored if --no-gpio is set")
-			.addKvPair("--gpio-latency", "ms", "Set latency for GPIO writes")
+			.addKvPair("--gpio-delay", "ms", "Set delay for GPIO writes")
+			.addFlag("--invert-gpio", "Invert the GPIO light")
 			// Image processor options
 			.addKvPair("--x-skip", "px", "Number of pixels to skip on the x axis when processing sweep 1 (not implemented)")
 			.addKvPair("--y-skip", "px", "Number of pixels to skip on the y axis when processing sweep 1 (not implemented)")
 			.addFlag("--trace-contours", "Enable the (dev) contour tracing algorithm")
 			.addFlag("--save-diff", "Save the diff image to a file (./img/delta[#].png). Requires processor.")
+			.addKvPair("--target-width", "px", "Minimum width of target")
+			.addKvPair("--target-height", "px", "Minimum height of target")
 			// Client options
 			.addKvPair("--udp-target", "address", "Specify the address to broadcast UDP packets to")
 			.alias("--rio-addr", "--udp-target")
