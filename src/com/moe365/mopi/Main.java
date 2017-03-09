@@ -171,12 +171,21 @@ public class Main {
 			System.exit(0);
 		}
 		
-		final int jpegQuality = parsed.getOrDefault("--jpeg-quality", 80);
-		System.out.println("JPEG quality: " + jpegQuality + "%");
 		if (device != null) {
-			final JPEGFrameGrabber fg = frameGrabber = device.getJPEGFrameGrabber(width, height, 0, V4L4JConstants.STANDARD_WEBCAM, jpegQuality,
-					device.getDeviceInfo().getFormatList().getNativeFormatOfType(ImagePalette.YUYV));
-			fg.setFrameInterval(parsed.getOrDefault("--fps-num", 1), parsed.getOrDefault("--fps-denom", 10));
+			//Get the JPEG quality. Default to 80 if not set
+			final int jpegQuality = parsed.getOrDefault("--jpeg-quality", 80);
+			System.out.println("JPEG quality: " + jpegQuality + "%");
+			
+			//Get native capture format (format that the camera actually provides)
+			//Whatever format is captured will be software converted to JPEG
+			ImageFormat imf = device.getDeviceInfo().getFormatList().getNativeFormatOfType(ImagePalette.MJPEG);
+			System.out.println("Capturing with format " + imf);
+			
+			//Actually create the framegrabber
+			final JPEGFrameGrabber fg = frameGrabber = device.getJPEGFrameGrabber(width, height, 0, V4L4JConstants.STANDARD_WEBCAM, jpegQuality, imf);
+			
+			//Set the target framerate to capture at. Default to 20FPS.
+			fg.setFrameInterval(parsed.getOrDefault("--fps-num", 1), parsed.getOrDefault("--fps-denom", 20));
 			System.out.println("Framerate: " + fg.getFrameInterval());
 			
 			
