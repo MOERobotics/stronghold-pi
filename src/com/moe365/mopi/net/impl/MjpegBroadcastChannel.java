@@ -73,9 +73,11 @@ public class MjpegBroadcastChannel extends AbstractWsDataChannel implements Runn
 	}
 	
 	public void offerFrame(VideoFrame frame) {
-		if (backlog.get() > 20)
+		if (backlog.get() > 10) {
 			//Backlog is too big; drop frame
+			System.out.println("Dropping frame (backlog = " + backlog.get() + ")");
 			return;
+		}
 		if (imageStatus.compareAndSet(STATUS_EMPTY, STATUS_WRITING)) {
 			synchronized (imageBuffer) {
 				imageBuffer.clear();
