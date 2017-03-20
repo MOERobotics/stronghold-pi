@@ -1,14 +1,14 @@
 package com.moe365.mopi.client;
 
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.SocketAddress;
 import java.net.SocketException;
+import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
+import java.nio.channels.DatagramChannel;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -35,7 +35,7 @@ public class MDNSRioClient extends AbstractRioClient {
 	/**
 	 * UDP socket to packets from.
 	 */
-	protected final DatagramSocket socket;
+	protected DatagramChannel channel;
 	
 	/**
 	 * Executor to run background tasks on. May be null if not attempting to resolve address.
@@ -125,51 +125,59 @@ public class MDNSRioClient extends AbstractRioClient {
 		this.mdnsListener.setHandler(this::handleMdnsResponse);
 		executor.submit(this.mdnsListener);
 		executor.submit(this::sendQueries);
-		this.socket = new DatagramSocket(null);
-		this.socket.setReuseAddress(true);
+		this.channel = DatagramChannel.open()
+				.setOption(StandardSocketOptions.SO_REUSEADDR, true)
+				.setOption(StandardSocketOptions.IP_MULTICAST_IF, netIf)
+				.bind(new InetSocketAddress(this.serverPort));
 		this.resetSocket();
 		System.out.println("Resolving to RIO " + serverPort + " => @ " + hostname + ':' + rioPort);
+		
+		try {
+			this.broadcast(new HelloRioPacket());
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 	
 	@Override
 	protected void send(ByteBuffer buffer) throws IOException {
 		SocketAddress address = this.address;
-		synchronized (socket) {
-		if (address == null || !socket.isBound()) {
-			System.err.println("Dropped packet to Rio");
-			return;
-		}
-		
-		DatagramPacket packet = new DatagramPacket(buffer.array(), buffer.position(), buffer.limit(), address);
-		try {
-			socket.send(packet);
-			System.out.println("Sent packet to Rio");
-		} catch (IOException e) {
-			this.resetSocket();
-			SocketAddress addr2 = this.address;
-			if (addr2 == null || !socket.isBound())
+		synchronized (this.channel) {
+			//Can we even send a packet?
+			if (address == null || !channel.isOpen()) {
+				System.err.println("Dropped packet to Rio");
 				return;
-			if (addr2 != address)
-				//Can we just change the address w/o creating a new object?
-				packet = new DatagramPacket(buffer.array(), buffer.position(), buffer.limit(), addr2);
+			}
+			
 			try {
-				socket.send(packet);
+				channel.send(buffer, address);
 				System.out.println("Sent packet to Rio");
+			} catch (IOException e) {
+				//Try to recover
+				this.resetSocket();
+				address = this.address;
+				if (address == null || !channel.isOpen())
+					return;
+				try {
+					channel.send(buffer, address);
+					System.out.println("Sent packet to Rio");
+				} catch (Throwable t) {
+					t.addSuppressed(e);
+					t.printStackTrace();
+					throw t;
+				}
 			} catch (Throwable t) {
+				//Ensure that every exception is printed
 				t.printStackTrace();
 				throw t;
 			}
-		} catch (Throwable t) {
-			t.printStackTrace();
-			throw t;
-		}
 		}
 	}
 	
 	protected void resetSocket() throws IOException {
-		SocketAddress addr = new InetSocketAddress(this.serverPort);
-		this.socket.close();
-		this.socket.bind(addr);
+		SocketAddress localAddress = new InetSocketAddress(this.serverPort);
+		//TODO finish
+		
 	}
 	
 	public void sendQueries() {
@@ -181,6 +189,7 @@ public class MDNSRioClient extends AbstractRioClient {
 			     .setType(DnsType.ANY)
 			     .build())
 			.build();
+		
 		while (!Thread.interrupted()) {
 			System.out.println("Querying mDNS for " + rioHostname);
 			try {
@@ -199,6 +208,7 @@ public class MDNSRioClient extends AbstractRioClient {
 	protected void handleMdnsResponse(DnsMessage message) {
 		if (!message.isResponse())
 			return;
+		
 		boolean isAddrIp6 = false;
 		InetAddress addr = null;
 		for (DnsRecord answer : message.getAnswers()) {
@@ -207,18 +217,47 @@ public class MDNSRioClient extends AbstractRioClient {
 			if (addr == null || (!isAddrIp6 && answer.getType() == DnsType.AAAA))
 				addr = ((AddressRDATA)answer.getData()).getAddress();
 		}
+		
 		if (addr == null)
 			return;
-		if (!addr.equals(this.address))
-			System.out.println("Resolved rio address to " + (this.address = new InetSocketAddress(addr, this.rioPort)));
+		
+		if (!addr.equals(this.address)) {
+			SocketAddress address = new InetSocketAddress(addr, this.rioPort);
+			this.address = address;
+			System.out.println("Resolved rio address to " + address);
+			
+			//Broadcast a 'hello' packet
+			try {
+				this.broadcast(new HelloRioPacket());
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
+		}
 	}
 	
 
 	
 	@Override
-	public void close() {
-		if (this.mdnsListener != null)
-			this.mdnsListener.close();
-		this.socket.close();
+	public void close() throws IOException {
+		IOException mdnsExcept = null;
+		
+		if (this.mdnsListener != null) {
+			try {
+				this.mdnsListener.close();
+			} catch (Exception e) {
+				mdnsExcept = (IOException) e;
+			}
+		}
+		
+		try {
+			this.channel.close();
+		} catch (Exception e) {
+			if (mdnsExcept != null)
+				e.addSuppressed(mdnsExcept);
+			throw e;
+		}
+		
+		if (mdnsExcept != null)
+			throw mdnsExcept;
 	}
 }

@@ -1,18 +1,20 @@
 package com.moe365.mopi.client;
 
 import java.io.IOException;
-import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.SocketException;
+import java.net.StandardSocketOptions;
+import java.nio.ByteBuffer;
+import java.nio.channels.DatagramChannel;
 
-public class StaticRioClient implements RioClient {
+public class StaticRioClient extends AbstractRioClient {
 	
 	protected final int serverPort;
 	
 	protected final int rioPort;
 	
-	protected final DatagramSocket socket;
+	protected final DatagramChannel channel;
 	/**
 	 * RoboRIO's address.
 	 */
@@ -21,34 +23,43 @@ public class StaticRioClient implements RioClient {
 	public StaticRioClient(SocketAddress addr) throws SocketException, IOException {
 		this(RioClient.SERVER_PORT, addr);
 	}
+	
 	/**
 	 * Create a client that WILL NOT resolve the passed address via mDNS
-	 * @param serverPort 
+	 * 
+	 * @param serverPort
 	 */
 	public StaticRioClient(int serverPort, SocketAddress addr) throws SocketException, IOException {
 		this.serverPort = serverPort;
 		this.address = addr;
+		
 		if (addr instanceof InetSocketAddress) {
-			//TODO finish
+			// TODO finish
 			InetSocketAddress iAddr = (InetSocketAddress) addr;
 			this.rioPort = iAddr.getPort();
 		} else {
 			this.rioPort = -1;
 		}
-		this.socket = new DatagramSocket(this.serverPort);
+		
+		this.channel = DatagramChannel.open()
+				.setOption(StandardSocketOptions.SO_REUSEADDR, true)
+				.bind(new InetSocketAddress(serverPort));
 		System.out.println("Connecting to RIO: " + serverPort + " => " + addr);
+		
+		// Send hello packet
+		{
+			RioPacket helloPacket = new HelloRioPacket();
+			this.broadcast(helloPacket);
+		}
 	}
 	
 	@Override
-	public void broadcast(RioPacket packet) throws IOException {
-		// TODO Auto-generated method stub
-		
+	protected void send(ByteBuffer buffer) throws IOException {
+		this.channel.send(buffer, this.address);
 	}
 	
-
 	@Override
 	public void close() throws IOException {
-		// TODO Auto-generated method stub
-		
+		this.channel.close();
 	}
 }
