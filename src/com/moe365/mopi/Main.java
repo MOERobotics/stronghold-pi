@@ -27,6 +27,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import javax.imageio.ImageIO;
 
 import com.moe365.mopi.CommandLineParser.ParsedCommandLineArguments;
+import com.moe365.mopi.client.RioClient;
+import com.moe365.mopi.client.StaticRioClient;
 import com.moe365.mopi.geom.Polygon;
 import com.moe365.mopi.geom.Polygon.PointNode;
 import com.moe365.mopi.geom.PreciseRectangle;
@@ -89,7 +91,6 @@ public class Main {
 	public static int height;
 	public static volatile boolean processorEnabled = true;
 	public static VideoDevice camera;
-	public static RoboRioClient rioClient;
 	public static JPEGFrameGrabber frameGrabber;
 	public static AbstractImageProcessor<?> processor;
 	
@@ -151,7 +152,7 @@ public class Main {
 		
 		final GpioPinDigitalOutput gpioPin = initGpio(parsed);
 		
-		final RoboRioClient client = initClient(parsed, executor);
+		final RioClient client = initClient(parsed, executor);
 		
 		final AbstractImageProcessor<?> tracer = processor = initProcessor(parsed, server, client);
 		
@@ -256,7 +257,7 @@ public class Main {
 		}
 	}
 	
-	protected static void testClient(RoboRioClient client) throws IOException, InterruptedException {
+	protected static void testClient(RioClient client) throws IOException, InterruptedException {
 		System.out.println("RUNNING TEST: CLIENT");
 		//just spews out UDP packets on a 3s loop
 		while (true) {
@@ -431,21 +432,22 @@ public class Main {
 	 * @return Rio client, or null if disabled
 	 * @throws SocketException
 	 */
-	protected static RoboRioClient initClient(ParsedCommandLineArguments args, ExecutorService executor) throws SocketException {
+	protected static RioClient initClient(ParsedCommandLineArguments args, ExecutorService executor) throws SocketException {
 		if (args.isFlagSet("--no-udp")) {
 			System.out.println("CLIENT DISABLED (cli)");
 			return null;
 		}
-		int port = args.getOrDefault("--udp-port", RoboRioClient.RIO_PORT);
-//		int retryTime = args.getOrDefault("--mdns-resolve-retry", RoboRioClient.RESOLVE_RETRY_TIME);
+		
+		int port = args.getOrDefault("--udp-port", RioClient.RIO_PORT);
+//		int retryTime = args.getOrDefault("--mdns-resolve-retry", RioClient.RESOLVE_RETRY_TIME);
 		if (port < 0) {
 			System.out.println("CLIENT DISABLED (port)");
 			return null;
 		}
-		String address = args.getOrDefault("--udp-target", RoboRioClient.RIO_ADDRESS);
+		String address = args.getOrDefault("--udp-target", RioClient.RIO_ADDRESS);
 		System.out.println("Address: " + address);
 		try {
-			return new RoboRioClient(RoboRioClient.SERVER_PORT, new InetSocketAddress(address, port));
+			return new StaticRioClient(RioClient.SERVER_PORT, new InetSocketAddress(address, port));
 //			return new RoboRioClient(executor, retryTime, NetworkInterface.getByName("eth0"), RoboRioClient.SERVER_PORT, address, port);
 		} catch (Exception e) {
 			//restrict scope of broken stuff
@@ -462,7 +464,7 @@ public class Main {
 	 * @param client
 	 * @return Image proccessor to handle images, or null if disabled
 	 */
-	protected static AbstractImageProcessor<?> initProcessor(ParsedCommandLineArguments args, final MPHttpServer httpServer, final RoboRioClient client) {
+	protected static AbstractImageProcessor<?> initProcessor(ParsedCommandLineArguments args, final MPHttpServer httpServer, final RioClient client) {
 		if (args.isFlagSet("--no-process")) {
 			System.out.println("PROCESSOR DISABLED");
 			return null;
