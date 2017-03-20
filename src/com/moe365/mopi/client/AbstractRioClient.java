@@ -26,7 +26,6 @@ public abstract class AbstractRioClient implements RioClient {
 			buffer.clear();
 			buffer.putInt(packetNum.incrementAndGet());
 			buffer.putShort((short)packet.getStatus());
-			buffer.putShort((short)0);
 			packet.writeTo(buffer);
 			buffer.flip();
 			send(buffer);
