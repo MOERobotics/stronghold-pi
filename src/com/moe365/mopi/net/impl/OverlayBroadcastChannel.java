@@ -1,12 +1,15 @@
 package com.moe365.mopi.net.impl;
 
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.moe365.mopi.geom.PreciseRectangle;
 import com.moe365.mopi.net.channel.DataChannelClient;
 import com.moe365.mopi.net.channel.DataChannelDirection;
 import com.moe365.mopi.net.channel.DataChannelMediaType;
 import com.moe365.mopi.net.packet.DataPacket;
+import com.moe365.mopi.net.packet.OverlayPacket;
 
 public class OverlayBroadcastChannel extends AbstractWsDataChannel implements Runnable {
 
@@ -43,6 +46,11 @@ public class OverlayBroadcastChannel extends AbstractWsDataChannel implements Ru
 	protected void onRecievePacket(DataPacket packet, DataChannelClient client) {
 		// TODO Auto-generated method stub
 		
+	}
+	
+	public void broadcastRectangles(List<PreciseRectangle> rectangles) {
+		System.out.println("Sending: " + rectangles);
+		this.broadcastPacket(new OverlayPacket(rectangles));
 	}
 	
 }

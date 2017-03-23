@@ -9,7 +9,7 @@ import org.eclipse.jetty.servlet.ServletHolder;
 
 import com.moe365.mopi.geom.Polygon;
 import com.moe365.mopi.geom.PreciseRectangle;
-import com.moe365.mopi.net.channel.DataChannel;
+import com.moe365.mopi.net.impl.OverlayBroadcastChannel;
 import com.moe365.mopi.net.impl.MjpegBroadcastChannel;
 import com.moe365.mopi.net.impl.RandomlyBroadcastingChannel;
 import com.moe365.mopi.net.impl.WsDataSource;
@@ -43,6 +43,10 @@ public class MPHttpServer {
 //		this.source.registerChannel(random);
 		this.videoChannel = new MjpegBroadcastChannel(this.source, 365, "Main MJPEG video stream", width, height);
 		this.source.registerChannel(this.videoChannel);
+		
+		this.overlayChannel = new OverlayBroadcastChannel(this.source, 366, videoChannel.getId(), "Main video overlay");
+		this.videoChannel.setMetadata("overlayChannelId", "" + this.overlayChannel.getId());
+		this.source.registerChannel(this.overlayChannel);
 	}
 	
 	
@@ -55,7 +59,7 @@ public class MPHttpServer {
 	}
 	
 	public void offerPolygons(List<Polygon> polygons) {
-		
+		this.overlayChannel.broadcastRectangles(rectangles);
 	}
 	
 	public void offerRectangles(List<PreciseRectangle> rectangles) {
