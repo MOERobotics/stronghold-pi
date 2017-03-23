@@ -59,11 +59,11 @@ public class MPHttpServer {
 	}
 	
 	public void offerPolygons(List<Polygon> polygons) {
-		this.overlayChannel.broadcastRectangles(rectangles);
+		
 	}
 	
 	public void offerRectangles(List<PreciseRectangle> rectangles) {
-		
+		this.overlayChannel.broadcastRectangles(rectangles);
 	}
 	
 	public void shutdown() throws Exception {
