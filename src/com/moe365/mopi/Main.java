@@ -170,6 +170,8 @@ public class Main {
 				case "processing":
 					testProcessing(processor, parsed);
 					break;
+				case "sse":
+					testSSE(server);
 				default:
 					System.err.println("Unknown test '" + target + "'");
 			}
@@ -208,8 +210,10 @@ public class Main {
 						//Drop frames taken before the LED had time to flash
 						if (gpioPin != null) {
 							long frameTimestamp = frame.getCaptureTime();
+							if (frameTimestamp < 0)
+								frameTimestamp = Integer.toUnsignedLong((int) frameTimestamp);
 							final long newTimestamp = System.nanoTime() / 1000 + gpioDelay;
-	//						System.out.format("F: %d C: %d U: %d N: %d\n", frameTimestamp, System.nanoTime() / 1000, ledUpdateTimestamp.get(), newTimestamp);
+							System.out.format("F: %d C: %d U: %d N: %d\n", frameTimestamp, System.nanoTime() / 1000, ledUpdateTimestamp.get(), newTimestamp);
 							if (ledUpdateTimestamp.accumulateAndGet(frameTimestamp, (threshold, _frameTimestmp)->(_frameTimestmp >= threshold ? newTimestamp : threshold)) != newTimestamp) {
 								//Drop frame (it was old)
 	//							System.out.println("[drop frame]");
@@ -273,7 +277,7 @@ public class Main {
 		}
 	}
 	
-	protected static void testSSE(MJPEGServer server) throws InterruptedException {
+	protected static void testSSE(MPHttpServer server) throws InterruptedException {
 		System.out.println("RUNNING TEST: SSE");
 		while (!Thread.interrupted()) {
 			List<PreciseRectangle> rects = new ArrayList<>(2);
@@ -581,7 +585,7 @@ public class Main {
 	 * 
 	 * @param server
 	 */
-	public static void disableProcessor(MJPEGServer server) {
+	public static void disableProcessor(MPHttpServer server) {
 		System.out.println("DISABLING CV");
 		if (camera == null) {
 			processorEnabled = false;
@@ -634,7 +638,7 @@ public class Main {
 		System.out.println("Port: " + port);
 		
 		if (port > 0 && !args.isFlagSet("--no-server")) {
-			MPHttpServer server = new MPHttpServer(port, args.getOrDefault("--moejs-dir", "../moe.js/build"));
+			MPHttpServer server = new MPHttpServer(port, args.getOrDefault("--moejs-dir", "../moe.js/build"), width, height);
 			try {
 				server.start();
 			} catch (Exception e) {
