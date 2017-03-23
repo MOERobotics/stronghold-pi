@@ -4,8 +4,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.moe365.mopi.RoboRioClient;
-
 public abstract class AbstractRioClient implements RioClient {
 	
 	/**
@@ -18,7 +16,7 @@ public abstract class AbstractRioClient implements RioClient {
 	 * Buffer backing packets.
 	 * TODO fix multithreading issues
 	 */
-	protected final ByteBuffer buffer = ByteBuffer.allocate(RoboRioClient.BUFFER_SIZE);
+	protected final ByteBuffer buffer = ByteBuffer.allocate(RioClient.BUFFER_SIZE);
 	
 	@Override
 	public void broadcast(RioPacket packet) throws IOException {

@@ -175,7 +175,7 @@ public class MDNSRioClient extends AbstractRioClient {
 	}
 	
 	protected void resetSocket() throws IOException {
-		SocketAddress localAddress = new InetSocketAddress(this.serverPort);
+//		SocketAddress localAddress = new InetSocketAddress(this.serverPort);
 		//TODO finish
 		
 	}
