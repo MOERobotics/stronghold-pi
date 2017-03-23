@@ -25,13 +25,13 @@ public class MjpegBroadcastChannel extends AbstractWsDataChannel implements Runn
 	
 	protected final ByteBuffer imageBuffer = ByteBuffer.allocate(256 * 1024);
 	
-	public MjpegBroadcastChannel(WsDataSource source, int id, String name) {
+	public MjpegBroadcastChannel(WsDataSource source, int id, String name, int width, int height) {
 		super(source, id, name);
 		this.subscribers = ConcurrentHashMap.newKeySet();
 		metadata.put("name", this.name);
 		metadata.put("video.format", "MJPEG");
-		metadata.put("video.width", "100");
-		metadata.put("video.height", "100");
+		metadata.put("video.width", Integer.toString(width));
+		metadata.put("video.height", Integer.toString(height));
 	}
 	
 	@Override

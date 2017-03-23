@@ -21,7 +21,9 @@ public class MPHttpServer {
 	protected final ServletContextHandler context;
 	protected final WsDataSource source;
 	protected final MjpegBroadcastChannel videoChannel;
-	public MPHttpServer(int port, String staticDir) {
+	protected final OverlayBroadcastChannel overlayChannel;
+	
+	public MPHttpServer(int port, String staticDir, int width, int height) {
 		this.server = new Server(port);
 		this.context = new ServletContextHandler(ServletContextHandler.SESSIONS | ServletContextHandler.NO_SECURITY);
 		context.setContextPath("/");
@@ -39,7 +41,7 @@ public class MPHttpServer {
 		
 //		DataChannel random = new RandomlyBroadcastingChannel(this.source, 1000, "random");
 //		this.source.registerChannel(random);
-		this.videoChannel = new MjpegBroadcastChannel(this.source, 365, "Main MJPEG video stream");
+		this.videoChannel = new MjpegBroadcastChannel(this.source, 365, "Main MJPEG video stream", width, height);
 		this.source.registerChannel(this.videoChannel);
 	}
 	
