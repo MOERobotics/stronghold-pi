@@ -10,6 +10,7 @@ public class ChannelMetadataPacket extends AbstractMutableDataPacket {
 	transient byte[] data;
 	int numEntries;
 	Map<String, String> map;
+	
 	public ChannelMetadataPacket(Map<String, String> metadata) {
 		super(PacketTypeCode.CHANNEL_METADATA);
 		this.map = metadata;

@@ -15,7 +15,7 @@ public class ChannelMetadataRequestPacket extends AbstractMutableDataPacket {
 	
 	public ChannelMetadataRequestPacket(ByteBuffer buf) {
 		super(buf);
-		this.targetChannelId = buf.getShort();
+		this.targetChannelId = buf.getShort() & 0xFF_FF;
 	}
 	
 	public int getTargetChannelId() {

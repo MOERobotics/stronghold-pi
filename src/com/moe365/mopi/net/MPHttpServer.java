@@ -9,7 +9,7 @@ import org.eclipse.jetty.servlet.ServletHolder;
 
 import com.moe365.mopi.geom.Polygon;
 import com.moe365.mopi.geom.PreciseRectangle;
-import com.moe365.mopi.net.channel.DataChannel;
+import com.moe365.mopi.net.impl.OverlayBroadcastChannel;
 import com.moe365.mopi.net.impl.MjpegBroadcastChannel;
 import com.moe365.mopi.net.impl.RandomlyBroadcastingChannel;
 import com.moe365.mopi.net.impl.WsDataSource;
@@ -21,7 +21,9 @@ public class MPHttpServer {
 	protected final ServletContextHandler context;
 	protected final WsDataSource source;
 	protected final MjpegBroadcastChannel videoChannel;
-	public MPHttpServer(int port, String staticDir) {
+	protected final OverlayBroadcastChannel overlayChannel;
+	
+	public MPHttpServer(int port, String staticDir, int width, int height) {
 		this.server = new Server(port);
 		this.context = new ServletContextHandler(ServletContextHandler.SESSIONS | ServletContextHandler.NO_SECURITY);
 		context.setContextPath("/");
@@ -39,8 +41,12 @@ public class MPHttpServer {
 		
 //		DataChannel random = new RandomlyBroadcastingChannel(this.source, 1000, "random");
 //		this.source.registerChannel(random);
-		this.videoChannel = new MjpegBroadcastChannel(this.source, 365, "Main MJPEG video stream");
+		this.videoChannel = new MjpegBroadcastChannel(this.source, 365, "Main MJPEG video stream", width, height);
 		this.source.registerChannel(this.videoChannel);
+		
+		this.overlayChannel = new OverlayBroadcastChannel(this.source, 366, videoChannel.getId(), "Main video overlay");
+		this.videoChannel.setMetadata("overlayChannelId", "" + this.overlayChannel.getId());
+		this.source.registerChannel(this.overlayChannel);
 	}
 	
 	
@@ -57,7 +63,7 @@ public class MPHttpServer {
 	}
 	
 	public void offerRectangles(List<PreciseRectangle> rectangles) {
-		
+		this.overlayChannel.broadcastRectangles(rectangles);
 	}
 	
 	public void shutdown() throws Exception {

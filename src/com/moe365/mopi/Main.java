@@ -1,5 +1,8 @@
 package com.moe365.mopi;
 
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -9,9 +12,9 @@ import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.net.InetSocketAddress;
-import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -21,13 +24,18 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import javax.imageio.ImageIO;
+
 import com.moe365.mopi.CommandLineParser.ParsedCommandLineArguments;
+import com.moe365.mopi.client.RioClient;
+import com.moe365.mopi.client.StaticRioClient;
 import com.moe365.mopi.geom.Polygon;
 import com.moe365.mopi.geom.Polygon.PointNode;
 import com.moe365.mopi.geom.PreciseRectangle;
 import com.moe365.mopi.net.MPHttpServer;
 import com.moe365.mopi.processing.AbstractImageProcessor;
 import com.moe365.mopi.processing.ContourTracer;
+import com.moe365.mopi.processing.DebuggingDiffGenerator;
 import com.pi4j.io.gpio.GpioController;
 import com.pi4j.io.gpio.GpioFactory;
 import com.pi4j.io.gpio.GpioPinDigitalOutput;
@@ -37,6 +45,7 @@ import com.pi4j.io.gpio.RaspiPin;
 
 import au.edu.jcu.v4l4j.Control;
 import au.edu.jcu.v4l4j.ControlList;
+import au.edu.jcu.v4l4j.ImageFormat;
 import au.edu.jcu.v4l4j.ImagePalette;
 import au.edu.jcu.v4l4j.JPEGFrameGrabber;
 import au.edu.jcu.v4l4j.V4L4JConstants;
@@ -71,6 +80,8 @@ import au.edu.jcu.v4l4j.exceptions.V4L4JException;
  */
 public class Main {
 	public static final int DEFAULT_PORT = 5800;
+	public static final int BOILER_TARGET_WIDTH = 20;
+	public static final int BOILER_TARGET_HEIGHT = 7;
 	/**
 	 * Version string. Should be semantically versioned.
 	 * @see <a href="semver.org">semver.org</a>
@@ -80,7 +91,6 @@ public class Main {
 	public static int height;
 	public static volatile boolean processorEnabled = true;
 	public static VideoDevice camera;
-	public static RoboRioClient rioClient;
 	public static JPEGFrameGrabber frameGrabber;
 	public static AbstractImageProcessor<?> processor;
 	
@@ -142,7 +152,7 @@ public class Main {
 		
 		final GpioPinDigitalOutput gpioPin = initGpio(parsed);
 		
-		final RoboRioClient client = initClient(parsed, executor);
+		final RioClient client = initClient(parsed, executor);
 		
 		final AbstractImageProcessor<?> tracer = processor = initProcessor(parsed, server, client);
 		
@@ -157,19 +167,34 @@ public class Main {
 				case "client":
 					testClient(client);
 					break;
+				case "processing":
+					testProcessing(processor, parsed);
+					break;
+				case "sse":
+					testSSE(server);
 				default:
 					System.err.println("Unknown test '" + target + "'");
 			}
-			device.release();
+			if (device != null)
+				device.release();
 			System.exit(0);
 		}
 		
-		final int jpegQuality = parsed.getOrDefault("--jpeg-quality", 80);
-		System.out.println("JPEG quality: " + jpegQuality + "%");
 		if (device != null) {
-			final JPEGFrameGrabber fg = frameGrabber = device.getJPEGFrameGrabber(width, height, 0, V4L4JConstants.STANDARD_WEBCAM, jpegQuality,
-					device.getDeviceInfo().getFormatList().getNativeFormatOfType(ImagePalette.YUYV));
-			fg.setFrameInterval(parsed.getOrDefault("--fps-num", 1), parsed.getOrDefault("--fps-denom", 10));
+			//Get the JPEG quality. Default to 80 if not set
+			final int jpegQuality = parsed.getOrDefault("--jpeg-quality", 80);
+			System.out.println("JPEG quality: " + jpegQuality + "%");
+			
+			//Get native capture format (format that the camera actually provides)
+			//Whatever format is captured will be software converted to JPEG
+			ImageFormat imf = device.getDeviceInfo().getFormatList().getNativeFormatOfType(ImagePalette.MJPEG);
+			System.out.println("Capturing with format " + imf);
+			
+			//Actually create the framegrabber
+			final JPEGFrameGrabber fg = frameGrabber = device.getJPEGFrameGrabber(width, height, 0, V4L4JConstants.STANDARD_WEBCAM, jpegQuality, imf);
+			
+			//Set the target framerate to capture at. Default to 20FPS.
+			fg.setFrameInterval(parsed.getOrDefault("--fps-num", 1), parsed.getOrDefault("--fps-denom", 20));
 			System.out.println("Framerate: " + fg.getFrameInterval());
 			
 			
@@ -177,31 +202,42 @@ public class Main {
 			
 			final AtomicLong ledUpdateTimestamp = new AtomicLong(0);
 			
-			final int gpioLatency = parsed.getOrDefault("--gpio-latency", 5);
+			final int gpioDelay = parsed.getOrDefault("--gpio-delay", 5);
 			
 			fg.setCaptureCallback(frame -> {
 					try {
+						boolean gpioState;
 						//Drop frames taken before the LED had time to flash
-						long currentTimestamp = frame.getCaptureTime();
-						final long newTimestamp = System.nanoTime() / 1000 + gpioLatency;
-						if (ledUpdateTimestamp.accumulateAndGet(currentTimestamp, (threshold, frameTimestamp)->(frameTimestamp >= threshold ? newTimestamp : threshold)) != newTimestamp) {
-							frame.recycle();
-							return;
+						if (gpioPin != null) {
+							long frameTimestamp = frame.getCaptureTime();
+							if (frameTimestamp < 0)
+								frameTimestamp = Integer.toUnsignedLong((int) frameTimestamp);
+							final long newTimestamp = System.nanoTime() / 1000 + gpioDelay;
+							System.out.format("F: %d C: %d U: %d N: %d\n", frameTimestamp, System.nanoTime() / 1000, ledUpdateTimestamp.get(), newTimestamp);
+							if (ledUpdateTimestamp.accumulateAndGet(frameTimestamp, (threshold, _frameTimestmp)->(_frameTimestmp >= threshold ? newTimestamp : threshold)) != newTimestamp) {
+								//Drop frame (it was old)
+	//							System.out.println("[drop frame]");
+								frame.recycle();
+								return;
+							}
+							
+							//Toggle GPIO pin (change the LED's state)
+							
+							gpioState = !ledState.get();
+							gpioPin.setState(gpioState || (!processorEnabled));
+							ledState.set(gpioState);
+						} else {
+							gpioState = false;
 						}
 						
-						//Toggle GPIO pin (change the LED's state)
-						boolean state = !ledState.get();
-						gpioPin.setState(state || (!processorEnabled));
-						ledState.set(state);
-						
 						//Offer frame to server & tracer
-						if (server != null && !state)
+						if (server != null && !gpioState)
 							//Only offer frames that were taken while the light was on 
 							server.offerFrame(frame);
 						
 						if (tracer != null && processorEnabled) {
 							//The tracer will call frame.recycle() when it's done with the frame
-							tracer.offerFrame(frame, ledState.get());
+							tracer.offerFrame(frame, gpioState);
 						} else {
 							frame.recycle();
 						}
@@ -225,7 +261,7 @@ public class Main {
 		}
 	}
 	
-	protected static void testClient(RoboRioClient client) throws IOException, InterruptedException {
+	protected static void testClient(RioClient client) throws IOException, InterruptedException {
 		System.out.println("RUNNING TEST: CLIENT");
 		//just spews out UDP packets on a 3s loop
 		while (true) {
@@ -241,7 +277,7 @@ public class Main {
 		}
 	}
 	
-	protected static void testSSE(MJPEGServer server) throws InterruptedException {
+	protected static void testSSE(MPHttpServer server) throws InterruptedException {
 		System.out.println("RUNNING TEST: SSE");
 		while (!Thread.interrupted()) {
 			List<PreciseRectangle> rects = new ArrayList<>(2);
@@ -253,6 +289,55 @@ public class Main {
 			rects.add(new PreciseRectangle(0.25,0.75,0.3,0.1));
 			server.offerRectangles(rects);
 			Thread.sleep(1000);
+		}
+	}
+	
+	private static long prof(ImageProcessor processor, BufferedImage[] on, BufferedImage[] off) {
+		final int len = on.length;
+		final int n = 50;
+		long[] sums = new long[len];
+		for (int i = 0; i < 50; i++) {
+			for (int j = 0; j < len; j++) {
+				long start = System.nanoTime();
+				processor.apply(on[j], off[j]);
+				long end = System.nanoTime();
+				sums[j] += (end - start) / n;
+			}
+		}
+		long result = 0;
+		for (int i = 0; i < len; i++)
+			result += sums[i] / len;
+		return result;
+	}
+	
+	protected static void testProcessing(AbstractImageProcessor<?> _processor, ParsedCommandLineArguments args) throws IOException, InterruptedException {
+		File dir = new File(args.get("--test-images"));
+		ImageProcessor processor = (ImageProcessor) _processor;
+		int numImages = 0;
+		List<Color> colors = Arrays.asList(Color.RED, Color.BLUE, Color.GREEN);
+		while (true) {
+			File onImgFile = new File(dir.getAbsolutePath(), "off" + numImages + ".png");
+			File offImgFile = new File(dir.getAbsolutePath(), "on" + numImages + ".png");
+			if (!(onImgFile.exists() && offImgFile.exists()))
+				break;
+			numImages++;
+			System.out.println("========== IMAGE " + numImages + " ===========");
+			BufferedImage onImg = ImageIO.read(onImgFile);
+			BufferedImage offImg = ImageIO.read(offImgFile);
+			List<PreciseRectangle> rectangles = processor.apply(onImg, offImg);
+			BufferedImage out = ((DebuggingDiffGenerator)processor.diff).imgFlt;
+			System.out.println("Found rectangles " + rectangles);
+
+			Graphics2D g = out.createGraphics();
+			int i = 0;
+			for (PreciseRectangle rect : rectangles) {
+				g.setColor(colors.get(i++));
+				g.drawRect((int)(rect.getX() * width), (int) (rect.getY() * height), (int) (rect.getWidth() * width), (int) (rect.getHeight() * height));
+			}
+			g.dispose();
+
+			File outFlt = new File("img", "flt" + numImages + ".png");
+			ImageIO.write(out, "PNG", outFlt);
 		}
 	}
 	
@@ -351,21 +436,22 @@ public class Main {
 	 * @return Rio client, or null if disabled
 	 * @throws SocketException
 	 */
-	protected static RoboRioClient initClient(ParsedCommandLineArguments args, ExecutorService executor) throws SocketException {
+	protected static RioClient initClient(ParsedCommandLineArguments args, ExecutorService executor) throws SocketException {
 		if (args.isFlagSet("--no-udp")) {
 			System.out.println("CLIENT DISABLED (cli)");
 			return null;
 		}
-		int port = args.getOrDefault("--udp-port", RoboRioClient.RIO_PORT);
-		int retryTime = args.getOrDefault("--mdns-resolve-retry", RoboRioClient.RESOLVE_RETRY_TIME);
+		
+		int port = args.getOrDefault("--udp-port", RioClient.RIO_PORT);
+//		int retryTime = args.getOrDefault("--mdns-resolve-retry", RioClient.RESOLVE_RETRY_TIME);
 		if (port < 0) {
 			System.out.println("CLIENT DISABLED (port)");
 			return null;
 		}
-		String address = args.getOrDefault("--udp-target", RoboRioClient.RIO_ADDRESS);
+		String address = args.getOrDefault("--udp-target", RioClient.RIO_ADDRESS);
 		System.out.println("Address: " + address);
 		try {
-			return new RoboRioClient(RoboRioClient.SERVER_PORT, new InetSocketAddress(address, port));
+			return new StaticRioClient(RioClient.SERVER_PORT, new InetSocketAddress(address, port));
 //			return new RoboRioClient(executor, retryTime, NetworkInterface.getByName("eth0"), RoboRioClient.SERVER_PORT, address, port);
 		} catch (Exception e) {
 			//restrict scope of broken stuff
@@ -382,7 +468,7 @@ public class Main {
 	 * @param client
 	 * @return Image proccessor to handle images, or null if disabled
 	 */
-	protected static AbstractImageProcessor<?> initProcessor(ParsedCommandLineArguments args, final MPHttpServer httpServer, final RoboRioClient client) {
+	protected static AbstractImageProcessor<?> initProcessor(ParsedCommandLineArguments args, final MPHttpServer httpServer, final RioClient client) {
 		if (args.isFlagSet("--no-process")) {
 			System.out.println("PROCESSOR DISABLED");
 			return null;
@@ -403,15 +489,23 @@ public class Main {
 			});
 			Main.processor = processor;
 		} else {
-			ImageProcessor processor = new ImageProcessor(width, height, rectangles-> {
-				//Filter based on AR
-				rectangles.removeIf(rectangle-> {
+			int targetWidth = args.getOrDefault("--target-width", BOILER_TARGET_WIDTH);
+			int targetHeight = args.getOrDefault("--target-height", BOILER_TARGET_HEIGHT);
+			System.out.println("Target dimensions: " + targetWidth + "x" + targetHeight);
+			ImageProcessor processor = new ImageProcessor(width, height, targetWidth, targetHeight, rectangles-> {
+//				System.out.println("Found " + rectangles.size() + " rects (preARfilter)");
+				//Filter based on aspect ratio (height/width)
+				//The targets for Steamworks are pretty close to 1:8, so filter out
+				//things that are more square-ish
+				/*rectangles.removeIf(rectangle -> {
 					double ar = rectangle.getHeight() / rectangle.getWidth();
-					return ar < .1 || ar > 10;
-				});
+					return ar > (1/6f) || ar < (1/16f);
+				});*/
+				
+				System.out.println("Found " + rectangles.size() + " rects");
 				//print the rectangles' dimensions to STDOUT
 				for (PreciseRectangle rectangle : rectangles)
-					System.out.println("=> " + rectangle);
+					System.out.println("=> (" + (rectangle.getX() + (rectangle.getWidth()/2)) * 100.0 + "," + (rectangle.getY() + (rectangle.getHeight()/2)) * 100.0 + ")");
 				
 				//send the largest rectangle(s) to the Rio
 				try {
@@ -430,9 +524,7 @@ public class Main {
 				//Offer the rectangles to be put in the SSE stream
 				if (httpServer != null)
 					httpServer.offerRectangles(rectangles);
-			});
-			if (args.isFlagSet("--save-diff"))
-				processor.saveDiff = true;
+			}, args.isFlagSet("--save-diff"));
 			Main.processor = processor;
 		}
 		Main.processor.start();
@@ -493,7 +585,7 @@ public class Main {
 	 * 
 	 * @param server
 	 */
-	public static void disableProcessor(MJPEGServer server) {
+	public static void disableProcessor(MPHttpServer server) {
 		System.out.println("DISABLING CV");
 		if (camera == null) {
 			processorEnabled = false;
@@ -546,7 +638,7 @@ public class Main {
 		System.out.println("Port: " + port);
 		
 		if (port > 0 && !args.isFlagSet("--no-server")) {
-			MPHttpServer server = new MPHttpServer(port, args.getOrDefault("--moejs-dir", "../moe.js/build"));
+			MPHttpServer server = new MPHttpServer(port, args.getOrDefault("--moejs-dir", "../moe.js/build"), width, height);
 			try {
 				server.start();
 			} catch (Exception e) {
@@ -612,6 +704,7 @@ public class Main {
 			.addFlag("--version", "Print the version string.")
 			.addFlag("--out", "Specify where to write log messages to (not implemented)")
 			.addKvPair("--test", "target", "Run test by name. Tests include 'controls', 'client', and 'sse'.")
+			.addKvPair("--test-images", "dir", "Directory in which images for testing are put")
 			.addKvPair("--props", "file", "Specify the file to read properties from (not implemented)")
 			.addKvPair("--write-props", "file", "Write properties to file, which can be passed into the --props arg in the future (not implemented)")
 			.addFlag("--rebuild-parser", "Rebuilds the parser binary file")
@@ -628,12 +721,15 @@ public class Main {
 			.alias("-p", "--port")
 			// GPIO options
 			.addKvPair("--gpio-pin", "pin number", "Set which GPIO pin to use. Is ignored if --no-gpio is set")
-			.addKvPair("--gpio-latency", "ms", "Set latency for GPIO writes")
+			.addKvPair("--gpio-delay", "ms", "Set delay for GPIO writes")
+			.addFlag("--invert-gpio", "Invert the GPIO light")
 			// Image processor options
 			.addKvPair("--x-skip", "px", "Number of pixels to skip on the x axis when processing sweep 1 (not implemented)")
 			.addKvPair("--y-skip", "px", "Number of pixels to skip on the y axis when processing sweep 1 (not implemented)")
 			.addFlag("--trace-contours", "Enable the (dev) contour tracing algorithm")
 			.addFlag("--save-diff", "Save the diff image to a file (./img/delta[#].png). Requires processor.")
+			.addKvPair("--target-width", "px", "Minimum width of target")
+			.addKvPair("--target-height", "px", "Minimum height of target")
 			// Client options
 			.addKvPair("--udp-target", "address", "Specify the address to broadcast UDP packets to")
 			.alias("--rio-addr", "--udp-target")

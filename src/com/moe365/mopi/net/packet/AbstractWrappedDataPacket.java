@@ -35,12 +35,12 @@ public abstract class AbstractWrappedDataPacket implements DataPacket {
 
 	@Override
 	public int getChannelId() {
-		return this.buf.getShort(DataPacket.CHANNEL_ID_OFFSET);
+		return this.buf.getShort(DataPacket.CHANNEL_ID_OFFSET) & 0xFF_FF;
 	}
 
 	@Override
 	public int getTypeCode() {
-		return this.buf.getShort(DataPacket.TYPE_CODE_OFFSET);
+		return this.buf.getShort(DataPacket.TYPE_CODE_OFFSET) & 0xFF_FF;
 	}
 
 	@Override

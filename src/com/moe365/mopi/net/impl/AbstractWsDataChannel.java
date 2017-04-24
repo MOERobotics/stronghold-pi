@@ -58,6 +58,11 @@ public abstract class AbstractWsDataChannel implements DataChannel {
 		return this.name;
 	}
 	
+	public void setMetadata(String key, String value) {
+		this.metadata.put(key, value);
+		System.out.println(metadata);
+	}
+	
 	protected final void setId(int id) {
 		this.id = id;
 	}

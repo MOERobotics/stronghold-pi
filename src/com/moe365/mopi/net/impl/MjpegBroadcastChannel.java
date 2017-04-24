@@ -1,5 +1,6 @@
 package com.moe365.mopi.net.impl;
 
+import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -20,16 +21,17 @@ public class MjpegBroadcastChannel extends AbstractWsDataChannel implements Runn
 	protected final int STATUS_WRITING = 3;
 	
 	protected final AtomicInteger imageStatus = new AtomicInteger(0);
+	protected final AtomicInteger backlog = new AtomicInteger(0);
 	
-	protected final ByteBuffer imageBuffer = ByteBuffer.allocate(100 * 1024);
+	protected final ByteBuffer imageBuffer = ByteBuffer.allocate(256 * 1024);
 	
-	public MjpegBroadcastChannel(WsDataSource source, int id, String name) {
+	public MjpegBroadcastChannel(WsDataSource source, int id, String name, int width, int height) {
 		super(source, id, name);
 		this.subscribers = ConcurrentHashMap.newKeySet();
 		metadata.put("name", this.name);
 		metadata.put("video.format", "MJPEG");
-		metadata.put("video.width", "100");
-		metadata.put("video.height", "100");
+		metadata.put("video.width", Integer.toString(width));
+		metadata.put("video.height", Integer.toString(height));
 	}
 	
 	@Override
@@ -54,8 +56,9 @@ public class MjpegBroadcastChannel extends AbstractWsDataChannel implements Runn
 		DataPacket imagePacket = StreamFramePacket.wrapImage(imageBuffer);
 		while (!Thread.interrupted()) {
 			if (imageStatus.compareAndSet(STATUS_FILLED, STATUS_READING)) {
+				backlog.incrementAndGet();
 				synchronized (imageBuffer) {
-					this.broadcastPacket(imagePacket);
+					this.broadcastPacket(imagePacket).whenComplete((r,e)->backlog.decrementAndGet());
 				}
 				imageStatus.set(STATUS_EMPTY);
 			}
@@ -70,10 +73,20 @@ public class MjpegBroadcastChannel extends AbstractWsDataChannel implements Runn
 	}
 	
 	public void offerFrame(VideoFrame frame) {
+		if (backlog.get() > 10) {
+			//Backlog is too big; drop frame
+			System.out.println("Dropping frame (backlog = " + backlog.get() + ")");
+			return;
+		}
 		if (imageStatus.compareAndSet(STATUS_EMPTY, STATUS_WRITING)) {
 			synchronized (imageBuffer) {
 				imageBuffer.clear();
-				imageBuffer.put(frame.getBuffer());
+				try {
+					imageBuffer.put(frame.getBuffer());
+				} catch (BufferOverflowException e) {
+					System.err.println("Oversized frame: " + frame.getBuffer().remaining());
+					throw e;
+				}
 				imageBuffer.flip();
 			}
 			imageStatus.set(STATUS_FILLED);

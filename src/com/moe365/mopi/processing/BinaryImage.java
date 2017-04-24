@@ -15,6 +15,20 @@ public interface BinaryImage {
 	 * @return the value of the image at the point
 	 */
 	boolean test(int x, int y);
+	
+	default boolean testRow(int y, int xMin, int xMax) {
+		for (int x = xMin; x < xMax; x++)
+			if (test(x, y))
+				return true;
+		return false;
+	}
+	
+	default boolean testCol(int x, int yMin, int yMax) {
+		for (int y = yMin; y < yMax; y++)
+			if (test(x, y))
+				return true;
+		return false;
+	}
 
 	/**
 	 * Test the coordinate (x, y) by rounding the doubles.
