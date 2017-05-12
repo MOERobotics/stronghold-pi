@@ -97,15 +97,23 @@ public class ImageProcessor extends AbstractImageProcessor<List<PreciseRectangle
 	}
 	
 	/**
-	 * Searches an image for blobs. You can think of it as a kind of binary search
-	 * of a 2d array.
-	 * @param img A boolean image, ordered row, column
-	 * @param result List to populate with bounding boxes
-	 * @param xMin Left bound of image to search (minimum index of the array)
-	 * @param xMax Right bound of the image to search (maximum index of the array)
-	 * @param yMin Top bound
-	 * @param yMax Bottom bound
-	 * @return
+	 * Searches an image for blobs. You can think of it as a kind of binary
+	 * search of a 2d array.
+	 * 
+	 * @param img
+	 *            A boolean image, ordered row, column
+	 * @param result
+	 *            List to populate with bounding boxes
+	 * @param xMin
+	 *            Left bound of image to search (minimum index of the array)
+	 * @param xMax
+	 *            Right bound of the image to search (maximum index of the
+	 *            array)
+	 * @param yMin
+	 *            Top bound
+	 * @param yMax
+	 *            Bottom bound
+	 * @return if any bounding boxes were found
 	 */
 	public boolean boundingBox(BinaryImage img, List<PreciseRectangle> result, final int xMin, final int xMax, final int yMin, final int yMax) {
 		int width = xMax - xMin;

@@ -21,6 +21,12 @@ import com.mindlin.mdns.FQDN;
 import com.mindlin.mdns.MDNSListener;
 import com.mindlin.mdns.rdata.AddressRDATA;
 
+/**
+ * RioClient that tries to send its packets to a MDNS address. While it is running, this client will
+ * continuously query the client's MDNS address, and, if it receives a new A/AAAA record, update the
+ * IP address that it is broadcasting to. 
+ * @author mailmindlin
+ */
 public class MDNSRioClient extends AbstractRioClient {
 	/**
 	 * RoboRIO's address. May change as it is continually resolved. NOT thread safe.s
@@ -84,8 +90,9 @@ public class MDNSRioClient extends AbstractRioClient {
 	/**
 	 * 
 	 * @param executor
-	 * @param port
-	 * @param addr
+	 * @param serverPort
+	 * @param hostname
+	 * @param rioPort
 	 * @throws SocketException
 	 * @throws IOException
 	 */
@@ -96,14 +103,18 @@ public class MDNSRioClient extends AbstractRioClient {
 	/**
 	 * 
 	 * @param executor
-	 * @param port
-	 * @param buffSize
-	 * @param addr
+	 * @param resolveRetryTime
+	 * @param netIf
+	 * @param serverPort
+	 * @param hostname
+	 * @param rioPort
 	 * @throws SocketException
-	 *             if the socket could not be opened, or the socket could not
+	 *             If the socket could not be opened, or the socket could not
 	 *             bind to the specified local port.
 	 * @throws SecurityException
 	 *             If this program is not allowed to connect to the given socket
+	 * @throws IOException
+	 *             If any other I/O error occurs.
 	 */
 	public MDNSRioClient(ExecutorService executor, long resolveRetryTime, NetworkInterface netIf, int serverPort, String hostname, int rioPort) throws SocketException, IOException {
 		this.executor = executor;

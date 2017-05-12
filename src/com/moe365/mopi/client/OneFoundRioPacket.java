@@ -4,6 +4,10 @@ import java.nio.ByteBuffer;
 
 import com.moe365.mopi.geom.PreciseRectangle;
 
+/**
+ * {@link RioPacket} that tells the Rio that we found one bounding box (and where it is, of course!)
+ * @author mailmindlin
+ */
 public class OneFoundRioPacket implements RioPacket {
 	double x;
 	double y;
@@ -29,7 +33,7 @@ public class OneFoundRioPacket implements RioPacket {
 	@Override
 	public int getLength() {
 		//4 doubles
-		return 8 * 4;
+		return 4 * Double.BYTES;
 	}
 
 	@Override

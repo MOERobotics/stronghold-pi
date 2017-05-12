@@ -108,6 +108,7 @@ public class Polygon {
 		
 		/**
 		 * Get the next node in the series.
+		 * @return next
 		 */
 		public PointNode next() {
 			return next;
@@ -115,6 +116,7 @@ public class Polygon {
 		
 		/**
 		 * Gets the next node, if it is not null.
+		 * @return next, or this
 		 */
 		public PointNode nextIfNotNull() {
 			if (next == null)
@@ -245,6 +247,8 @@ public class Polygon {
 	
 	/**
 	 * Add point to the end of the polygon chain.
+	 * @param x 
+	 * @param y 
 	 */
 	public void addPoint(double x, double y) {
 		start.insertBefore(x, y);

@@ -3,6 +3,10 @@ package com.moe365.mopi.client;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
+/**
+ * A {@link RioPacket} that broadcasts an error message.
+ * @author mailmindlin
+ */
 public class ErrorRioPacket implements RioPacket {
 	private final String message;
 

@@ -1,6 +1,12 @@
 package com.moe365.mopi.client;
+
 import java.nio.ByteBuffer;
 
+/**
+ * An abstract
+ * 
+ * @author mailmindlin
+ */
 public interface RioPacket {
 	
 	/**
@@ -23,15 +29,16 @@ public interface RioPacket {
 	 * be included in the packet.
 	 */
 	public static final short STATUS_TWO_FOUND = 3;
-	//Statuses >= 0x8000 are special metadata things, and shouldn't be discarded, ever
+	// Statuses >= 0x8000 are special metadata things, and shouldn't be
+	// discarded, ever
 	/**
 	 * A packet that contains an error message
 	 */
 	public static final short STATUS_ERROR = (short) 0x8000;
 	/**
 	 * A packet that notifies the reciever that the sender has just connected.
-	 * If this packet is recieved, the reciever should reset its last-recieved packet id
-	 * to the id of this packet.
+	 * If this packet is recieved, the reciever should reset its last-recieved
+	 * packet id to the id of this packet.
 	 */
 	public static final short STATUS_HELLO_WORLD = (short) 0x8001;
 	/**
@@ -41,14 +48,23 @@ public interface RioPacket {
 	
 	/**
 	 * Get the status code for this packet
+	 * 
+	 * @return this packet's status
 	 */
 	int getStatus();
+	
 	/**
 	 * Get the length (in bytes) of the payload
+	 * 
+	 * @return this packet's payload length
 	 */
 	int getLength();
+	
 	/**
 	 * Write payload to buffer
+	 * 
+	 * @param buffer
+	 *            Buffer to write this packet's payload to
 	 */
 	void writeTo(ByteBuffer buffer);
 }

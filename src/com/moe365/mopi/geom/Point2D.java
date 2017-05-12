@@ -71,6 +71,7 @@ public class Point2D implements Externalizable, Cloneable {
 	
 	/**
 	 * Get the slope from this point to the other point.
+	 * @param other 
 	 * 
 	 * @return slope
 	 */

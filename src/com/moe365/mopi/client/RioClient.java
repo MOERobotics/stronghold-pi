@@ -39,11 +39,11 @@ import com.moe365.mopi.geom.PreciseRectangle;
  * <h3>Status Codes</h3>
  * A status code may be one of the following:
  * <ol start="0">
- * <li>{@linkplain #STATUS_NOP NOP}</li>
- * <li>{@linkplain #STATUS_NONE_FOUND NONE_FOUND}</li>
- * <li>{@linkplain #STATUS_ONE_FOUND ONE_FOUND}</li>
- * <li>{@linkplain #STATUS_TWO_FOUND TWO_FOUND}</li>
- * <li>{@linkplain #STATUS_ERROR ERROR}</li>
+ * <li>{@linkplain RioPacket#STATUS_NOP NOP}</li>
+ * <li>{@linkplain RioPacket#STATUS_NONE_FOUND NONE_FOUND}</li>
+ * <li>{@linkplain RioPacket#STATUS_ONE_FOUND ONE_FOUND}</li>
+ * <li>{@linkplain RioPacket#STATUS_TWO_FOUND TWO_FOUND}</li>
+ * <li>{@linkplain RioPacket#STATUS_ERROR ERROR}</li>
  * </ol>
  * All other status codes are reserved for future use.
  * </section>

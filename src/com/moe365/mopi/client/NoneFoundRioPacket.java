@@ -2,6 +2,10 @@ package com.moe365.mopi.client;
 
 import java.nio.ByteBuffer;
 
+/**
+ * {@link RioPacket} that tells the Rio that we didn't find any bounding boxes.
+ * @author mailmindlin
+ */
 public class NoneFoundRioPacket implements RioPacket {
 
 	@Override
@@ -16,7 +20,7 @@ public class NoneFoundRioPacket implements RioPacket {
 
 	@Override
 	public void writeTo(ByteBuffer buffer) {
-		
+		//We have no data to write
 	}
 
 }

@@ -18,7 +18,7 @@ public interface DataChannel {
 	/**
 	 * Get the id of this channel
 	 * 
-	 * @return
+	 * @return channel id
 	 */
 	int getId();
 
@@ -26,14 +26,14 @@ public interface DataChannel {
 	 * Get the name of this channel. Channel names can be 0-255 bytes when UTF-8
 	 * encoded.
 	 * 
-	 * @return
+	 * @return channel name
 	 */
 	String getName();
 
 	/**
 	 * Get the media type of this channel.
 	 * 
-	 * @return
+	 * @return channel media type
 	 */
 	DataChannelMediaType getType();
 
@@ -53,7 +53,7 @@ public interface DataChannel {
 	/**
 	 * Get the current list of subscribers to this channel
 	 * 
-	 * @return
+	 * @return subscribers to this channel
 	 */
 	Set<DataChannelClient> getSubscribers();
 
@@ -108,7 +108,7 @@ public interface DataChannel {
 	 *            Client to send packet to
 	 * @param timeout
 	 *            Timeout for the first
-	 * @return
+	 * @return future for the response packet
 	 */
 	<T extends DataPacket> CompletableFuture<T> sendPacketExpectResponse(DataPacket packet, DataChannelClient target, Duration timeout);
 	
