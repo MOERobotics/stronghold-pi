@@ -5,7 +5,26 @@ import java.util.function.BiFunction;
 
 /**
  * Another implementation of the algorithm used in {@link DiffGenerator}, except that it's implemented a bit more efficiently here.
- * TODO explain implementation
+ * <p>
+ * The idea is that using a boolean[][] to back our returned BinaryImage is bad because:
+ * <ol>
+ * <li>Each boolean requires 1 byte of space which isn't terribly efficient</li>
+ * <li>We have to do a lot of lookups when testing a row/column</li>
+ * <li>We can't optimize a lot of the operations at all</li>
+ * </ol>
+ * The solution, presented by this class, is that we can use a long[][] to back our BinaryImage, such that each long (called a tile) is a bitmap
+ * for an 8x8 square of the image. This is nice, because we a) solved our space problem, as longs can be aligned on almost all architectures nicely,
+ * b) we reduce the number of array lookups by 8x to 64x (compared to a boolean[][]-backed BinaryImage; depending on the operation being performed),
+ * and c) we can do a lot of our (hopefully pretty common) operations in parallel with bitmasks.
+ * </p>
+ * <p>
+ * If you aren't familiar with bitmasks, bitmaps, or bitwise operations (or just like Wikipedia), see:
+ * <ol>
+ * <li><a href="https://en.wikipedia.org/wiki/Bitwise_operation#AND">Bitwise AND</a></li>
+ * <li><a href="https://en.wikipedia.org/wiki/Mask_(computing)">Bitmask</a></li>
+ * <li><a href="https://en.wikipedia.org/wiki/Bitmap">Bitmap (not as important)</a></li>
+ * </ol>
+ * </p>
  * @author mailmindlin
  * @see DiffGenerator
  */
@@ -41,6 +60,8 @@ public class LazyDiffGenerator implements BiFunction<BufferedImage, BufferedImag
 	
 	/**
 	 * Calculates the delta between two 8x8 squares of the images.
+	 * 
+	 * TODO maybe explain tile format or something
 	 * 
 	 * @param onPx
 	 *            Pixels from the 'on' image
@@ -136,6 +157,11 @@ public class LazyDiffGenerator implements BiFunction<BufferedImage, BufferedImag
 		return new TiledBinaryImage(tiles);
 	}
 	
+	/**
+	 * A binary array backed by a long[][] (where each long is an 8x8 bitmask).
+	 * Gives us a bit (no pun intended) better performance.
+	 * @author mailmindlin
+	 */
 	public static class TiledBinaryImage implements BinaryImage {
 		protected final long[][] tiles;
 		
@@ -143,6 +169,55 @@ public class LazyDiffGenerator implements BiFunction<BufferedImage, BufferedImag
 			this.tiles = tiles;
 		}
 		
+		/**
+		 * Test a single pixel of this image.
+		 * <p>
+		 * We have to assume that this operation isn't as common as others such
+		 * as {@link #testCol(int, int, int)} or {@link #testRow(int, int, int)}
+		 * , because this method will actually perform a (little) bit worse than
+		 * a <code>boolean[][]</code> lookup, so hopefully we regain most of the
+		 * cost through the other operations.
+		 * </p>
+		 * <p>
+		 * This method first looks up the tile that the pixel should reside on,
+		 * then generates a mask for only that pixel. For example, looking up
+		 * the value of the pixel at (3,2):
+		 * 
+		 * <pre>
+		 *     ┌                 ┐
+		 *     | - - - - - - - - |
+		 *     | - - 1 1 1 - - - |
+		 *     | - - - - 1 - - - |
+		 * T = | - - 1 1 1 - - - |
+		 *     | - - - - - - - - |
+		 *     | - - - - - - - - |
+		 *     | - - - - - - - - |
+		 *     | - - - - - - - - |
+		 *     └                 ┘
+		 *     ┌                 ┐
+		 *     | - - - - - - - - |
+		 *     | - - - - - - - - |
+		 *     | - - - 1 - - - - |
+		 * M = | - - - - - - - - |
+		 *     | - - - - - - - - |
+		 *     | - - - - - - - - |
+		 *     | - - - - - - - - |
+		 *     | - - - - - - - - |
+		 *     └                 ┘
+		 * </pre>
+		 * 
+		 * Then <code>(T & M) == 0</code> should get the value of that bit.
+		 * </p>
+		 * <p>
+		 * This method has undefined behavior if testing outside the range
+		 * covered by this image. It may throw an ArrayIndexOutOfBoundsException
+		 * or emit nasal demons.
+		 * </p>
+		 * 
+		 * @param x
+		 * @param y
+		 * @return
+		 */
 		@Override
 		public boolean test(int x, int y) {
 			long tile = tiles[y / 8][x / 8];
@@ -150,6 +225,71 @@ public class LazyDiffGenerator implements BiFunction<BufferedImage, BufferedImag
 			return (tile & mask) != 0;
 		}
 		
+		/**
+		 * This method tests if <i>any</i> pixel on the row {@code y} between
+		 * {@code xMin} and {@code xMax} is set.
+		 * <p>
+		 * We can accelerate this operation with bitmasks (yay!), to test larger
+		 * swathes at a time (approaching 8x speed). Assuming we have a tile
+		 * (T):
+		 * 
+		 * <pre>
+		 *     ┌                 ┐
+		 *     | - - - - - - - - |
+		 *     | - - 1 1 1 - - - |
+		 *     | - - - - 1 - - - |
+		 * T = | - - 1 1 1 - - - |
+		 *     | - - - - - - - - |
+		 *     | - - - - - - - - |
+		 *     | - - - - - - - - |
+		 *     | - - - - - - - - |
+		 *     └                 ┘
+		 * </pre>
+		 * 
+		 * and we're testing all the pixels in y=5, we can build a mask (M):
+		 * 
+		 * <pre>
+		 *     ┌                 ┐
+		 *     | - - - - - - - - |
+		 *     | - - - - - - - - |
+		 *     | - - - - - - - - |
+		 * M = | - - - - - - - - |
+		 *     | - - - - - - - - |
+		 *     | 1 1 1 1 1 1 1 1 |
+		 *     | - - - - - - - - |
+		 *     | - - - - - - - - |
+		 *     └                 ┘
+		 * </pre>
+		 * 
+		 * Then {@code (T & M) == 0} should be enough to test all the pixels on
+		 * the row y=5 on tile T.
+		 * </p>
+		 * <p>
+		 * Note that for the first and last tile, we may have to use a second
+		 * mask, to ignore all the columns that are not in the range [xMin,
+		 * xMax].
+		 * </p>
+		 * <p>
+		 * As far as speed is concerned, we're only doing 1/64 (if unoptimized)
+		 * to 1/8 (best case) of the lookups as a simple boolean[][]-based
+		 * BinaryImage would have to do (and therefore fewer bounds checking),
+		 * and considering that most of the 'extra' operations (e.g., to build
+		 * the masks) are cheap for the CPU to do, this method does a lot
+		 * better.
+		 * <p>
+		 * This method has undefined behavior if testing outside the range
+		 * covered by this image. It may throw an ArrayIndexOutOfBoundsException
+		 * or emit nasal demons.
+		 * </p>
+		 * 
+		 * @param y
+		 *            Y coordinate of row to test
+		 * @param xMin
+		 *            Minimum x coordinate on row to test (inclusive)
+		 * @param xMax
+		 *            Maximum x coordinate on row to test (inclusive)
+		 * @return True iff any pixel in the given range is on
+		 */
 		@Override
 		public boolean testRow(int y, int xMin, int xMax) {
 			//We can test rows and cols faster
@@ -178,6 +318,21 @@ public class LazyDiffGenerator implements BiFunction<BufferedImage, BufferedImag
 			return false;
 		}
 		
+		/**
+		 * Basically the same as {@link #testRow(int, int, int)}, just rotated
+		 * for columns. We get a little bit less performance out of this method
+		 * compared to {@link #testRow(int, int, int)}, just because our backing
+		 * array is y-indexed (and we loose some CPU caching, I think), but it's
+		 * still much better than a boolean[][]-based implementation.
+		 * 
+		 * @param x
+		 *            Column to test
+		 * @param yMin
+		 *            Minimum y coordinate to test (inclusive)
+		 * @param yMax
+		 *            Maximum y coordinate to test (inclusive)
+		 * @return True iff any pixel in the range specified is on
+		 */
 		@Override
 		public boolean testCol(int x, int yMin, int yMax) {
 			//Mask that only selects bits in our column
