@@ -6,7 +6,7 @@ import java.util.function.BiFunction;
 public class TracingLazyDiffGenerator implements BiFunction<BufferedImage, BufferedImage, BinaryImage> {
 	//Left-shift by column
 	private static final long COL_MASK = dup(0b1000_0000);
-			
+	
 	private static long dup(int b) {
 		long r = b | (b << 16);
 		r |= r << 8;

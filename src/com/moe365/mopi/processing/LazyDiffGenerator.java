@@ -3,17 +3,31 @@ package com.moe365.mopi.processing;
 import java.awt.image.BufferedImage;
 import java.util.function.BiFunction;
 
+/**
+ * Another implementation of the algorithm used in {@link DiffGenerator}, except that it's implemented a bit more efficiently here.
+ * TODO explain implementation
+ * @author mailmindlin
+ * @see DiffGenerator
+ */
 public class LazyDiffGenerator implements BiFunction<BufferedImage, BufferedImage, BinaryImage> {
 	//Left-shift by column
 	private static final long COL_MASK = dup(0b1000_0000);
-			
+	
+	/**
+	 * Utility method to duplicate a byte to all bytes of a long.
+	 * This method is used for making masks
+	 * For example, <code>dup(0xF0) == 0xF0F0F0F0F0F0F0F0L</code>.
+	 * @param b Byte to duplicate. Range should be {@code 0 <= b <= 255}.
+	 * @return
+	 */
 	private static long dup(int b) {
-		long r = b | (b << 16);
-		r |= r << 8;
-		r |= r << 32;
+		long r = b | (b << 16);//Fill in bytes 0 & 2
+		r |= r << 8;//Fill in bytes 1 & 3 also
+		r |= r << 32;//Duplicate to 2nd half of long
 		return r;
 	}
 	
+	//Frame bounds
 	protected final int frameMinX, frameMaxX, frameMinY, frameMaxY;
 	protected final int tolerance;//70
 	
@@ -25,6 +39,15 @@ public class LazyDiffGenerator implements BiFunction<BufferedImage, BufferedImag
 		this.tolerance = tolerance;
 	}
 	
+	/**
+	 * Calculates the delta between two 8x8 squares of the images.
+	 * 
+	 * @param onPx
+	 *            Pixels from the 'on' image
+	 * @param offPx
+	 *            Pixels from thie 'off' image
+	 * @return Delta calculated
+	 */
 	private long evalTile(int[] onPx, int[] offPx) {
 		long result = 0;
 		//RGB array already matches our format
@@ -33,17 +56,17 @@ public class LazyDiffGenerator implements BiFunction<BufferedImage, BufferedImag
 			int px1 = onPx[i];
 			int r1 = (px1 & 0x00FF0000) >> 16;
 			int g1 = (px1 & 0x0000FF00) >> 8;
-			int b1 = (px1 & 0x000000FF) >> 0;
+			//int b1 = (px1 & 0x000000FF) >> 0;
 			
 			int px2 = offPx[i];
 			int r2 = (px2 & 0x00FF0000) >> 16;
 			int g2 = (px2 & 0x0000FF00) >> 8;
-			int b2 = (px2 & 0x000000FF) >> 0;
+			//int b2 = (px2 & 0x000000FF) >> 0;
 			
 			//Find difference between pixels
 			int dr = r1 - r2;
 			int dg = g1 - g2;
-			int db = b1 - b2;
+			//int db = b1 - b2;
 			
 			if (dg > tolerance && (dr < dg - 10 || dr < tolerance))
 				result |= 1L << i;
@@ -68,13 +91,15 @@ public class LazyDiffGenerator implements BiFunction<BufferedImage, BufferedImag
 		final int yTiles= (height + 7) / 8;
 		final long[][] tiles = new long[yTiles][xTiles];
 		
-		//Arrays to store the RGB pixels used to calculate each chunk
+		//Arrays to store the RGB pixels used to calculate each chunk. Their values change every iteration,
+		//but we don't have to allocate them every time this way.
 		int[] onPixels = new int[64];
 		int[] offPixels = new int[64];
 		
 		for (int v = 0; v < height / 8; v++) {
 			long[] tilesRow = tiles[v];
 			for (int u = 0; u < width / 8; u++) {
+				//Grab 2 8x8 squares
 				onImg.getRGB(u * 8, v * 8, 8, 8, onPixels, 0, 8);
 				offImg.getRGB(u * 8, v * 8, 8, 8, offPixels, 0, 8);
 				tilesRow[u] = evalTile(onPixels, offPixels);
@@ -152,6 +177,8 @@ public class LazyDiffGenerator implements BiFunction<BufferedImage, BufferedImag
 				//More masks for the first and last tiles, because we might not be using all of them
 				//Basically, we're cutting off the top or the bottom rows that we won't be using.
 				//Note that -1L is the identity mask (all bits are on)
+				//TODO move into loop, because we might not use these masks every time this method is called,
+				//so let's not calculate them if we don't have to (the cost of calculating these isn't much, but it's nonzero).
 				final long maskI = (-1L) << ((yMin % 8) * 8);
 				final long maskF = (-1L) >>> ((yMax % 8) * 8);
 				
