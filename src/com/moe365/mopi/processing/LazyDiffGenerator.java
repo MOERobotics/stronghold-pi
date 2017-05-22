@@ -133,72 +133,79 @@ public class LazyDiffGenerator implements BiFunction<BufferedImage, BufferedImag
 			}
 		}
 		
-		return new BinaryImage() {
+		return new TiledBinaryImage(tiles);
+	}
+	
+	public static class TiledBinaryImage implements BinaryImage {
+		protected final long[][] tiles;
+		
+		public TiledBinaryImage(long[][] tiles) {
+			this.tiles = tiles;
+		}
+		
+		@Override
+		public boolean test(int x, int y) {
+			long tile = tiles[y / 8][x / 8];
+			long mask = (1L << ((y % 8) * 8 + x % 8));
+			return (tile & mask) != 0;
+		}
+		
+		@Override
+		public boolean testRow(int y, int xMin, int xMax) {
+			//We can test rows and cols faster
+			final long mask = 0xFFL << (8 * (y % 8));
+			//Mask the columns that are out of range on the first and last tiles
+			final long maskI = dup(0xFF >> (xMin & 8));
+			//TODO could do with Integer.reverseBytes, but not sure if actually faster
+			final long maskF = dup(0xFF & (0xFF << xMax));
 			
-			@Override
-			public boolean test(int x, int y) {
-				long tile = tiles[y / 8][x / 8];
-				long mask = (1L << ((y % 8) * 8 + x % 8));
-				return (tile & mask) != 0;
-			}
+			final int v = y / 8;
+			final int uMin = xMin / 8;
+			final int uMax = xMax / 8;
+			final long[] tileRow = tiles[v];
 			
-			@Override
-			public boolean testRow(int y, int xMin, int xMax) {
-				//We can test rows and cols faster
-				final long mask = 0xFFL << (8 * (y % 8));
-				//Mask the columns that are out of range on the first and last tiles
-				final long maskI = dup(0xFF >> (xMin & 8));
-				//TODO could do with Integer.reverseBytes, but not sure if actually faster
-				final long maskF = dup(0xFF & (0xFF << xMax));
-				
-				final int v = y / 8;
-				final int uMin = xMin / 8;
-				final int uMax = xMax / 8;
-				final long[] tileRow = tiles[v];
-				
-				for (int u = uMin; u <= uMax; u++) {
-					long tile = tileRow[u] & mask;
-					if (tile != 0) {//This shouldn't be true often
-						if (u == uMin)
-							tile &= maskI;
-						if (u == uMax)
-							tile &= maskF;
-						if (tile != 0)
-							return true;
-					}
+			for (int u = uMin; u <= uMax; u++) {
+				long tile = tileRow[u] & mask;
+				if (tile != 0) {//This shouldn't be true often
+					if (u == uMin)
+						tile &= maskI;
+					if (u == uMax)
+						tile &= maskF;
+					if (tile != 0)
+						return true;
 				}
-				return false;
 			}
+			return false;
+		}
+		
+		@Override
+		public boolean testCol(int x, int yMin, int yMax) {
+			//Mask that only selects bits in our column
+			final long mask = COL_MASK >>> (x % 8);
+			//More masks for the first and last tiles, because we might not be using all of them
+			//Basically, we're cutting off the top or the bottom rows that we won't be using.
+			//Note that -1L is the identity mask (all bits are on)
+			//TODO move into loop, because we might not use these masks every time this method is called,
+			//so let's not calculate them if we don't have to (the cost of calculating these isn't much, but it's nonzero).
+			final long maskI = (-1L) << ((yMin % 8) * 8);
+			final long maskF = (-1L) >>> ((yMax % 8) * 8);
 			
-			@Override
-			public boolean testCol(int x, int yMin, int yMax) {
-				//Mask that only selects bits in our column
-				final long mask = COL_MASK >>> (x % 8);
-				//More masks for the first and last tiles, because we might not be using all of them
-				//Basically, we're cutting off the top or the bottom rows that we won't be using.
-				//Note that -1L is the identity mask (all bits are on)
-				//TODO move into loop, because we might not use these masks every time this method is called,
-				//so let's not calculate them if we don't have to (the cost of calculating these isn't much, but it's nonzero).
-				final long maskI = (-1L) << ((yMin % 8) * 8);
-				final long maskF = (-1L) >>> ((yMax % 8) * 8);
-				
-				final int u = x / 8;
-				final int vMin = yMin / 8;
-				final int vMax = yMax / 8;
-				
-				for (int v = vMin; v <= vMax; v++) {
-					long tile = tiles[v][u] & mask;
-					if (tile != 0) {
-						if (v == vMin)
-							tile &= maskI;
-						if (v == vMax)
-							tile &= maskF;
-						if (tile != 0)
-							return true;
-					}
+			final int u = x / 8;
+			final int vMin = yMin / 8;
+			final int vMax = yMax / 8;
+			
+			for (int v = vMin; v <= vMax; v++) {
+				long tile = tiles[v][u] & mask;
+				if (tile != 0) {
+					if (v == vMin)
+						tile &= maskI;
+					if (v == vMax)
+						tile &= maskF;
+					if (tile != 0)
+						return true;
 				}
-				return false;
 			}
-		};
+			return false;
+		}
 	}
 }
