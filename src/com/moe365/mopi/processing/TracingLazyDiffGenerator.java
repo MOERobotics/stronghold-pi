@@ -3,6 +3,7 @@ package com.moe365.mopi.processing;
 import java.awt.image.BufferedImage;
 import java.util.function.BiFunction;
 
+@Deprecated
 public class TracingLazyDiffGenerator implements BiFunction<BufferedImage, BufferedImage, BinaryImage> {
 	//Left-shift by column
 	private static final long COL_MASK = dup(0b1000_0000);
