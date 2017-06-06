@@ -16,6 +16,35 @@ public interface BinaryImage {
 	 */
 	boolean test(int x, int y);
 	
+	/**
+	 * Test if <i>any</i> pixel in the specified range is set.
+	 * <p>
+	 * Implementations may override this method in the name of performance, but
+	 * all implementations MUST (as in
+	 * <a href="https://www.ietf.org/rfc/rfc2119.txt">RFC 2119 MUST</a>):
+	 * <ol>
+	 * <li>Have no side-effects</li>
+	 * <li>Be functionally equivalent to:
+	 * 
+	 * <pre>
+	 * for (int x = xMin; x < xMax; x++)
+	 * 	   if (text(x, y))
+	 * 		   return true;
+	 * return false;
+	 * </pre>
+	 * 
+	 * </li>
+	 * </ol>
+	 * </p>
+	 * 
+	 * @param y
+	 *            Row to test
+	 * @param xMin
+	 *            Leftmost column of range to test (included in range)
+	 * @param xMax
+	 *            Rightmost column of range to test (included in range)
+	 * @return {@code true} iff <i>any</i> pixel in the specified range is true.
+	 */
 	default boolean testRow(int y, int xMin, int xMax) {
 		for (int x = xMin; x < xMax; x++)
 			if (test(x, y))
@@ -23,6 +52,14 @@ public interface BinaryImage {
 		return false;
 	}
 	
+	/**
+	 * TODO document
+	 * @param x
+	 * @param yMin
+	 * @param yMax
+	 * @return
+	 * @see #testRow(int, int, int)
+	 */
 	default boolean testCol(int x, int yMin, int yMax) {
 		for (int y = yMin; y < yMax; y++)
 			if (test(x, y))

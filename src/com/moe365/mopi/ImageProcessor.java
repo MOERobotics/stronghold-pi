@@ -17,6 +17,12 @@ import com.moe365.mopi.processing.DiffGenerator;
 import au.edu.jcu.v4l4j.VideoFrame;
 import au.edu.jcu.v4l4j.exceptions.UnsupportedMethod;
 
+/**
+ * 
+ * @author mailmindlin
+ * @see DiffGenerator
+ * @see com.moe365.mopi.processing.LazyDiffGenerator LazyDiffGenerator
+ */
 public class ImageProcessor extends AbstractImageProcessor<List<PreciseRectangle>> {
 	public static final int DEFAULT_TOLERANCE = 70;
 	

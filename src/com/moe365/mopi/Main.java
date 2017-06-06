@@ -58,7 +58,7 @@ import au.edu.jcu.v4l4j.exceptions.V4L4JException;
 /**
  * Main entry point for Moe Pi.
  * <p>
- * Command line options include:
+ * Command line options include (but aren't limited to):
  * <dl>
  * <dt>-?</dt>
  * <dt>-h</dt>
@@ -86,9 +86,10 @@ public class Main {
 	 * Version string. Should be semantically versioned.
 	 * @see <a href="semver.org">semver.org</a>
 	 */
-	public static final String version = "0.4.0-alpha";
+	public static final String version = "0.4.7-alpha";
 	public static int width;
 	public static int height;
+	@Deprecated
 	public static volatile boolean processorEnabled = true;
 	public static VideoDevice camera;
 	public static JPEGFrameGrabber frameGrabber;

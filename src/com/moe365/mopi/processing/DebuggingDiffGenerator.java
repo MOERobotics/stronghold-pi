@@ -16,7 +16,7 @@ public class DebuggingDiffGenerator extends DiffGenerator {
 	}
 	
 	@Override
-	public BinaryImage apply(BufferedImage onImg, BufferedImage offImg) {
+	public RichBinaryImage apply(BufferedImage onImg, BufferedImage offImg) {
 		// boolean array of the results. A cell @ result[y][x] is only
 		int height = this.frameMaxY - this.frameMinY;
 		int width = this.frameMaxX - this.frameMinX;
@@ -67,11 +67,23 @@ public class DebuggingDiffGenerator extends DiffGenerator {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		return new BinaryImage() {
-			@Override
-			public boolean test(int x, int y) {
-				return result[y][x];
-			}
-		};
+		
+		return new RichBinaryImage(result, imgFlt);
+	}
+	
+	public static class RichBinaryImage implements BinaryImage {
+		boolean[][] data;
+		BufferedImage diffImg;
+		
+		public RichBinaryImage(boolean[][] data, BufferedImage diffImg) {
+			this.data = data;
+			this.diffImg = diffImg;
+		}
+		
+		@Override
+		public boolean test(int x, int y) {
+			return this.data[y][x];
+		}
+		
 	}
 }

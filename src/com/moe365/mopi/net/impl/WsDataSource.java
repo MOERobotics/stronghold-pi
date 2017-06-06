@@ -157,7 +157,6 @@ public class WsDataSource extends WebSocketServlet implements DataSource {
 				case PacketTypeCode.CHANNEL_SUBSCRIBE: {
 					System.out.println("Channel subscription from " + client);
 					ChannelSubscribePacket subscribePacket = (ChannelSubscribePacket) packet;
-					int[] ids = subscribePacket.getChannelIds();
 					for (int id : subscribePacket.getChannelIds()) {
 						System.out.println("\tSubscribing to channel #" + id);
 						AbstractWsDataChannel channel = channels.get(id);
