@@ -5,11 +5,13 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
+import java.util.stream.Collectors;
 
 import com.moe365.mopi.net.channel.DataChannel;
 import com.moe365.mopi.net.channel.DataChannelClient;
@@ -120,18 +122,22 @@ public abstract class AbstractWsDataChannel implements DataChannel {
 	@Override
 	public CompletableFuture<Void> broadcastPacketExpectResponse(DataPacket packet,
 			BiConsumer<DataPacket, DataChannelClient> responseHandler, Duration timeout) {
-		ArrayList<CompletableFuture<DataPacket>> result = new ArrayList<>();
+		
+		//Build packet only once
 		DataPacket prepared = preparePacket(packet);
 		
-		for (WsClient subscriber : subscribers) {
-			// TODO finish
-		}
+		List<CompletableFuture<? extends DataPacket>> results = this.getSubscribers()
+			.parallelStream()
+			.map(subscriber -> this.sendPacketExpectResponse(prepared, subscriber, timeout))
+			.collect(Collectors.toList());
 		
-		//TODO *when* exactly should the result of this method be completed?
-		//After writing to all the endpoints? After recieving the first response?
-		//After all the responses?
-		//Should it fail if timed out before any of the endpoints responded?
-		return CompletableFuture.allOf(result.toArray(new CompletableFuture[result.size()]));
+		/*
+		 * TODO *when* exactly should the result of this method be completed?
+		 * After writing to all the endpoints? After recieving the first response?
+		 * After all the responses?
+		 * Should it fail if timed out before any of the endpoints responded?
+		 */
+		return CompletableFuture.allOf(results.toArray(new CompletableFuture[results.size()]));
 	}
 
 	@Override
