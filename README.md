@@ -1,14 +1,14 @@
-# MOE 365 FRC Stronghold Raspberry Pi Code
-<table><tr><th colspan=2>Stronghold 2016 Code</th></tr><tr><td><a href="https://github.com/MOERobotics/2016Stronghold-CaMOElot">RoboRio</a></td><td>Raspberry Pi</td></tr></table>
-Raspberry Pi code for FRC stronghold challenge.
+# MOE 365 FRC Power Up Raspberry Pi Code
+<table><tr><th colspan=2>Steamworks 2017 Code</th></tr><tr><td><a href="https://github.com/MOERobotics/robot_2017">RoboRio</a></td><td>Raspberry Pi</td></tr></table>
+Raspberry Pi code for FRC
 
 # Details
 The program is written in a heavily modular fashion, where (almost?) every segment of code can be disabled at runtime. This modularity is advantageous at competitions, as allows massive changes in the system with no or minimal changes to the code. In fact, we were able to use GRIP to detect the goal (as a fallback, in case the head referees decided that the flashing LED was against the rules), instead of the normal image processing module, by only changing a few command line flags. In spite of this model, the program is by no means fragmented, and each module is deeply integrated with multiple others.
 
 ## Image Capturing
-To capture images from a variety of webcams, we use [v4l4j](/mailmindlin/v4l4j). With this library, we are able to not only recieve frames from the cameras, but also control the settings, to better process images.
+To capture images from a variety of webcams, we use [v4l4j](/mailmindlin/v4l4j). With this library, we are able to not only recieve frames from the cameras, but also control the settings, to better process images such as the resolution and time stamps.
 
-### LED Control
+## LED Control
 More of a sub-module, MoePi uses the [Pi4J library](pi4j.com) to control a LED. While this task may seem simple, which it is, it plays a major part in the image processing, synchronized exactly with the camera.
 
 ## HTTP Server
@@ -19,3 +19,8 @@ Our image processor works by not looking for places in an image that are lit up,
 
 ## Data Broadcasting
 To keep latency and bandwidth low, we developed a custom UDP packet structure to communicate to the RoboRio.
+
+## Accessibility
+All you need is a Raspberry Pi two or above and a formated micro SD card and the MOE Pi Jar file and you are ready to ssh into the Pi. 
+
+Creators: Liam Feehery and Jared Falk
